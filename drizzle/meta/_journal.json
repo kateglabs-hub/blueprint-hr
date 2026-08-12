@@ -15,6 +15,13 @@
       "when": 1786554988748,
       "tag": "0001_spooky_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786568486681,
+      "tag": "0002_cooing_grandmaster",
+      "breakpoints": true
     }
   ]
 }

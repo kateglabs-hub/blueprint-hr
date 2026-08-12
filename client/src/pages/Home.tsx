@@ -15,12 +15,22 @@ import {
   Briefcase, DollarSign, Calendar, CheckCircle2, AlertCircle, LogOut, UserCheck, Settings, Search
 } from "lucide-react";
 import { toast } from "sonner";
-import { startLogin } from "@/const";
 
 export default function Home() {
   const { user, isAuthenticated, logout } = useAuth();
   const utils = trpc.useUtils();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [loginEmail, setLoginEmail] = useState("admin@blueprinthr.co.ke");
+  const [loginPassword, setLoginPassword] = useState("BluePrint!2026");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const loginMutation = trpc.auth.login.useMutation({
+    onSuccess: async () => {
+      toast.success("Welcome back to BluePrint HR.");
+      await utils.auth.me.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   // State for Employee creation dialog
   const [isEmployeeOpen, setIsEmployeeOpen] = useState(false);
@@ -119,25 +129,55 @@ export default function Home() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl text-center space-y-6">
-          <div className="w-16 h-16 bg-blue-600/20 text-blue-400 rounded-2xl flex items-center justify-center mx-auto">
-            <Building2 className="w-8 h-8" />
+      <div className="min-h-screen bg-[#07111f] text-slate-100 flex items-center justify-center p-5 relative overflow-hidden">
+        <div className="absolute -top-36 -right-28 w-96 h-96 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="absolute -bottom-44 -left-32 w-[28rem] h-[28rem] rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="relative z-10 w-full max-w-5xl grid lg:grid-cols-[1.05fr_0.95fr] rounded-[2rem] overflow-hidden border border-white/10 bg-slate-900/80 shadow-2xl shadow-black/30 backdrop-blur-xl">
+          <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-blue-700 via-blue-800 to-slate-950">
+            <div>
+              <div className="w-12 h-12 bg-white/15 rounded-2xl flex items-center justify-center font-bold tracking-tight text-xl mb-8">BP</div>
+              <p className="text-blue-100/80 text-sm uppercase tracking-[0.28em] font-semibold">BluePrint HR</p>
+              <h1 className="mt-5 text-5xl font-semibold leading-[1.05] tracking-tight">People operations, brought into focus.</h1>
+              <p className="mt-6 text-blue-100/75 leading-relaxed max-w-md">A Kenya-focused HR and payroll foundation for modern teams — structured, compliant, and ready to scale.</p>
+            </div>
+            <div className="space-y-3 text-sm text-blue-100/80">
+              <p className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-cyan-300" /> Multi-tenant architecture with strict isolation</p>
+              <p className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-cyan-300" /> Employee master with Kenya statutory identifiers</p>
+              <p className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-cyan-300" /> Role-aware workflows and audit visibility</p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">BluePrint HR</h1>
-            <p className="text-sm text-slate-400">Kenya-focused Multi-Tenant Payroll & HR Management SaaS Platform</p>
+          <div className="p-7 sm:p-12 bg-slate-950/70">
+            <div className="lg:hidden w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-bold tracking-tight text-xl mb-8">BP</div>
+            <div className="max-w-sm mx-auto">
+              <p className="text-sm text-blue-400 font-semibold tracking-wide">SECURE WORKSPACE ACCESS</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">Sign in to your workspace</h2>
+              <p className="mt-3 text-sm text-slate-400">Use your BluePrint HR account credentials to continue.</p>
+              <form className="mt-9 space-y-5" onSubmit={(event) => {
+                event.preventDefault();
+                loginMutation.mutate({ email: loginEmail, password: loginPassword });
+              }}>
+                <div className="space-y-2">
+                  <Label htmlFor="login-email" className="text-slate-300">Work email</Label>
+                  <Input id="login-email" type="email" autoComplete="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} className="h-12 bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-600" placeholder="you@company.co.ke" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password" className="text-slate-300">Password</Label>
+                  <div className="relative">
+                    <Input id="login-password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} className="h-12 pr-20 bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-600" placeholder="Enter your password" required minLength={8} />
+                    <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-blue-400">{showPassword ? "Hide" : "Show"}</button>
+                  </div>
+                </div>
+                <Button type="submit" disabled={loginMutation.isPending} className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/20">
+                  {loginMutation.isPending ? "Signing in…" : "Sign in securely"}
+                </Button>
+              </form>
+              <div className="mt-7 rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-xs text-slate-400 leading-relaxed">
+                <p className="font-semibold text-slate-200 mb-1">Initial administrator access</p>
+                <p>For the first deployment, the seeded account is pre-filled above. Change the password after sign-in before inviting additional users.</p>
+              </div>
+              <p className="mt-7 text-center text-xs text-slate-600">Protected by signed, server-side sessions · Kenya-ready HR foundation</p>
+            </div>
           </div>
-          <div className="bg-slate-800/50 p-4 rounded-xl text-left text-xs text-slate-300 space-y-2 border border-slate-700/50">
-            <p className="font-semibold text-blue-400">Phase 1 Enterprise Foundation:</p>
-            <p>✓ Strict Tenant Isolation (tenantId)</p>
-            <p>✓ 5 Roles: Super Admin, Company Admin, HR Manager, Payroll Manager, Employee</p>
-            <p>✓ KRA PIN, NSSF Number, SHIF Number & Bank Details</p>
-            <p>✓ Complete Audit Logs & Organization Structure</p>
-          </div>
-          <Button onClick={() => startLogin()} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20">
-            Sign In with Manus OAuth
-          </Button>
         </div>
       </div>
     );

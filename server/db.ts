@@ -8,6 +8,7 @@ import {
   Employee, InsertEmployee, AuditLog, InsertAuditLog
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, hashPassword, localOpenIdForEmail } from './auth';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -144,6 +145,23 @@ export async function seedInitialData() {
         details: "Initialized BluePrint HR Phase 1 seed data with Kenya statutory compliance config."
       });
     }
+
+    // Ensure a local administrator can access the application even when OAuth is unavailable.
+    const adminRows = await db.select().from(users).where(eq(users.email, DEFAULT_ADMIN_EMAIL)).limit(1);
+    if (adminRows.length === 0) {
+      await db.insert(users).values({
+        openId: localOpenIdForEmail(DEFAULT_ADMIN_EMAIL),
+        name: "BluePrint HR Administrator",
+        email: DEFAULT_ADMIN_EMAIL,
+        passwordHash: hashPassword(DEFAULT_ADMIN_PASSWORD),
+        loginMethod: "password",
+        tenantId: 1,
+        role: "Company Admin",
+        lastSignedIn: new Date(),
+      });
+    } else if (!adminRows[0]?.passwordHash) {
+      await db.update(users).set({ passwordHash: hashPassword(DEFAULT_ADMIN_PASSWORD), loginMethod: "password" }).where(eq(users.id, adminRows[0].id));
+    }
   } catch (err) {
     console.error("[Database] Seed error:", err);
   }
@@ -217,6 +235,13 @@ export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.email, email.trim().toLowerCase())).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 

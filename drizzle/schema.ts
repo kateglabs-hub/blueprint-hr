@@ -16,9 +16,7 @@ export const users = mysqlTable("users", {
     "Company Admin",
     "HR Manager",
     "Payroll Manager",
-    "Employee",
-    "user",
-    "admin"
+    "Employee"
   ]).default("Employee").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -42,6 +40,23 @@ export const tenants = mysqlTable("tenants", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+/**
+ * Companies table mirroring tenant enterprise profiles as specified in spec.
+ */
+export const companies = mysqlTable("companies", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  companyName: varchar("companyName", { length: 200 }).notNull(),
+  kraPin: varchar("kraPin", { length: 20 }),
+  email: varchar("email", { length: 150 }),
+  phone: varchar("phone", { length: 50 }),
+  address: text("address"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
 
 /**
  * Organization: Branches
@@ -109,7 +124,7 @@ export const grades = mysqlTable("grades", {
 export const employmentTypes = mysqlTable("employment_types", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
-  name: varchar("name", { length: 100 }).notNull(), // Permanent, Contract, Intern, Probation
+  name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -131,9 +146,9 @@ export const employees = mysqlTable("employees", {
   gender: varchar("gender", { length: 20 }),
   dob: date("dob"),
   idNo: varchar("idNo", { length: 30 }),
-  kraPin: varchar("kraPin", { length: 30 }).notNull(), // KRA PIN
-  nssfNo: varchar("nssfNo", { length: 30 }), // NSSF Number
-  shifNo: varchar("shifNo", { length: 30 }), // SHIF Number (Social Health Insurance Fund)
+  kraPin: varchar("kraPin", { length: 30 }).notNull(),
+  nssfNo: varchar("nssfNo", { length: 30 }),
+  shifNo: varchar("shifNo", { length: 30 }),
   phone: varchar("phone", { length: 30 }),
   email: varchar("email", { length: 150 }),
   branchId: int("branchId"),
@@ -143,7 +158,7 @@ export const employees = mysqlTable("employees", {
   employmentTypeId: int("employmentTypeId"),
   employmentDate: date("employmentDate"),
   terminationDate: date("terminationDate"),
-  employmentStatus: varchar("employmentStatus", { length: 30 }).default("Active").notNull(), // Active, Terminated, Suspended, Resigned
+  employmentStatus: varchar("employmentStatus", { length: 30 }).default("Active").notNull(),
   basicSalary: decimal("basicSalary", { precision: 12, scale: 2 }).notNull(),
   bankName: varchar("bankName", { length: 100 }),
   bankBranch: varchar("bankBranch", { length: 100 }),
@@ -162,8 +177,8 @@ export const auditLogs = mysqlTable("audit_logs", {
   tenantId: int("tenantId").notNull(),
   userId: int("userId"),
   userName: varchar("userName", { length: 150 }),
-  action: varchar("action", { length: 50 }).notNull(), // CREATE, UPDATE, DELETE
-  entityType: varchar("entityType", { length: 100 }).notNull(), // Employee, Department, Tenant, etc.
+  action: varchar("action", { length: 50 }).notNull(),
+  entityType: varchar("entityType", { length: 100 }).notNull(),
   entityId: int("entityId"),
   details: text("details"),
   ipAddress: varchar("ipAddress", { length: 50 }),
@@ -177,6 +192,9 @@ export type InsertUser = typeof users.$inferInsert;
 
 export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = typeof tenants.$inferInsert;
+
+export type Company = typeof companies.$inferSelect;
+export type InsertCompany = typeof companies.$inferInsert;
 
 export type Branch = typeof branches.$inferSelect;
 export type InsertBranch = typeof branches.$inferInsert;

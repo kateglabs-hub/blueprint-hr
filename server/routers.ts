@@ -6,7 +6,9 @@ import { z } from "zod";
 import * as db from "./db";
 import { TRPCError } from "@trpc/server";
 
-// Helper to enforce role & tenant
+// Run seed on router load
+db.seedInitialData().catch(err => console.error("[Seed] Failed:", err));
+
 const tenantProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -31,7 +33,7 @@ export const appRouter = router({
       return { success: true } as const;
     }),
     updateRole: protectedProcedure
-      .input(z.object({ role: z.enum(["Super Admin", "Company Admin", "HR Manager", "Payroll Manager", "Employee", "user", "admin"]) }))
+      .input(z.object({ role: z.enum(["Super Admin", "Company Admin", "HR Manager", "Payroll Manager", "Employee"]) }))
       .mutation(async ({ ctx, input }) => {
         const database = await db.getDb();
         if (database) {
@@ -43,12 +45,14 @@ export const appRouter = router({
       }),
   }),
 
-  // Tenant / Company Setup
   tenant: router({
     get: tenantProcedure.query(async ({ ctx }) => {
       return await db.getTenantById(ctx.tenantId);
     }),
-    list: tenantProcedure.query(async () => {
+    list: tenantProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "Super Admin" && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
       return await db.getTenants();
     }),
     create: tenantProcedure
@@ -61,7 +65,7 @@ export const appRouter = router({
         subdomain: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "Super Admin" && ctx.user.role !== "Company Admin" && ctx.user.role !== "admin") {
+        if (ctx.user.role !== "Super Admin" && ctx.user.role !== "Company Admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Only Admins can register companies." });
         }
         const tenantId = await db.createTenant({
@@ -74,7 +78,7 @@ export const appRouter = router({
           status: "Active",
         });
         await db.createAuditLog({
-          tenantId,
+          tenantId: Number(tenantId),
           userId: ctx.user.id,
           userName: ctx.user.name || "User",
           action: "CREATE",
@@ -86,7 +90,6 @@ export const appRouter = router({
       }),
   }),
 
-  // Organization Structure
   org: router({
     branches: tenantProcedure.query(async ({ ctx }) => {
       return await db.getBranches(ctx.tenantId);
@@ -94,7 +97,7 @@ export const appRouter = router({
     createBranch: tenantProcedure
       .input(z.object({ name: z.string(), code: z.string().optional(), location: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        if (!["Super Admin", "Company Admin", "HR Manager", "admin"].includes(ctx.user.role)) {
+        if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
         const id = await db.createBranch({ tenantId: ctx.tenantId, ...input });
@@ -116,7 +119,7 @@ export const appRouter = router({
     createDepartment: tenantProcedure
       .input(z.object({ name: z.string(), code: z.string().optional(), branchId: z.number().optional() }))
       .mutation(async ({ ctx, input }) => {
-        if (!["Super Admin", "Company Admin", "HR Manager", "admin"].includes(ctx.user.role)) {
+        if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
         const id = await db.createDepartment({ tenantId: ctx.tenantId, ...input });
@@ -138,7 +141,7 @@ export const appRouter = router({
     createDesignation: tenantProcedure
       .input(z.object({ name: z.string(), description: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        if (!["Super Admin", "Company Admin", "HR Manager", "admin"].includes(ctx.user.role)) {
+        if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
         const id = await db.createDesignation({ tenantId: ctx.tenantId, ...input });
@@ -160,7 +163,7 @@ export const appRouter = router({
     createGrade: tenantProcedure
       .input(z.object({ name: z.string(), level: z.string().optional(), minSalary: z.string().optional(), maxSalary: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        if (!["Super Admin", "Company Admin", "HR Manager", "admin"].includes(ctx.user.role)) {
+        if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
         const id = await db.createGrade({
@@ -188,7 +191,7 @@ export const appRouter = router({
     createEmploymentType: tenantProcedure
       .input(z.object({ name: z.string(), description: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        if (!["Super Admin", "Company Admin", "HR Manager", "admin"].includes(ctx.user.role)) {
+        if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
         const id = await db.createEmploymentType({ tenantId: ctx.tenantId, ...input });
@@ -205,7 +208,6 @@ export const appRouter = router({
       }),
   }),
 
-  // Employee Master
   employee: router({
     list: tenantProcedure.query(async ({ ctx }) => {
       return await db.getEmployees(ctx.tenantId);
@@ -225,7 +227,7 @@ export const appRouter = router({
         gender: z.string().optional(),
         dob: z.string().optional(),
         idNo: z.string().optional(),
-        kraPin: z.string(), // KRA PIN required for Kenya compliance
+        kraPin: z.string(),
         nssfNo: z.string().optional(),
         shifNo: z.string().optional(),
         phone: z.string().optional(),
@@ -243,7 +245,7 @@ export const appRouter = router({
         accountNumber: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (!["Super Admin", "Company Admin", "HR Manager", "admin"].includes(ctx.user.role)) {
+        if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Only HR or Admins can create employees." });
         }
         const id = await db.createEmployee({
@@ -316,7 +318,7 @@ export const appRouter = router({
         accountNumber: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (!["Super Admin", "Company Admin", "HR Manager", "admin"].includes(ctx.user.role)) {
+        if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized to update employee." });
         }
         const { id, ...data } = input;
@@ -342,7 +344,7 @@ export const appRouter = router({
     delete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (!["Super Admin", "Company Admin", "HR Manager", "admin"].includes(ctx.user.role)) {
+        if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Unauthorized to delete employee." });
         }
         await db.deleteEmployee(input.id, ctx.tenantId);
@@ -359,10 +361,9 @@ export const appRouter = router({
       }),
   }),
 
-  // Audit Logs
   audit: router({
     list: tenantProcedure.query(async ({ ctx }) => {
-      if (!["Super Admin", "Company Admin", "HR Manager", "admin"].includes(ctx.user.role)) {
+      if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
       return await db.getAuditLogs(ctx.tenantId);

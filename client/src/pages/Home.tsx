@@ -15,7 +15,7 @@ import {
   Briefcase, DollarSign, Calendar, CheckCircle2, AlertCircle, LogOut, UserCheck, Settings, Search
 } from "lucide-react";
 import { toast } from "sonner";
-import { startLogin } from "@/_core/const";
+import { startLogin } from "@/const";
 
 export default function Home() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -35,7 +35,9 @@ export default function Home() {
     shifNo: "",
     basicSalary: "85000",
     employmentStatus: "Active",
-    departmentId: 1,
+    bankName: "",
+    bankBranch: "",
+    accountNumber: "",
   });
 
   // State for Org Setup dialogs
@@ -49,6 +51,9 @@ export default function Home() {
   const [isTenantOpen, setIsTenantOpen] = useState(false);
   const [companyName, setCompanyName] = useState("");
   const [tenantKra, setTenantKra] = useState("");
+  const [tenantEmail, setTenantEmail] = useState("");
+  const [tenantPhone, setTenantPhone] = useState("");
+  const [tenantAddress, setTenantAddress] = useState("");
 
   // Queries
   const { data: tenant } = trpc.tenant.get.useQuery(undefined, { enabled: isAuthenticated });
@@ -58,7 +63,7 @@ export default function Home() {
   const { data: designations = [] } = trpc.org.designations.useQuery(undefined, { enabled: isAuthenticated });
   const { data: grades = [] } = trpc.org.grades.useQuery(undefined, { enabled: isAuthenticated });
   const { data: employmentTypes = [] } = trpc.org.employmentTypes.useQuery(undefined, { enabled: isAuthenticated });
-  const { data: auditLogs = [], refetch: refetchAudit } = trpc.audit.list.useQuery(undefined, { enabled: isAuthenticated && ["Super Admin", "Company Admin", "HR Manager", "admin"].includes(user?.role || "") });
+  const { data: auditLogs = [], refetch: refetchAudit } = trpc.audit.list.useQuery(undefined, { enabled: isAuthenticated && ["Super Admin", "Company Admin", "HR Manager"].includes(user?.role || "") });
 
   // Mutations
   const updateRoleMutation = trpc.auth.updateRole.useMutation({
@@ -138,16 +143,6 @@ export default function Home() {
     );
   }
 
-  const roleColors: Record<string, string> = {
-    "Super Admin": "bg-purple-500/10 text-purple-400 border-purple-500/20",
-    "Company Admin": "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    "HR Manager": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    "Payroll Manager": "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    "Employee": "bg-slate-500/10 text-slate-300 border-slate-500/20",
-    "admin": "bg-purple-500/10 text-purple-400 border-purple-500/20",
-    "user": "bg-slate-500/10 text-slate-300 border-slate-500/20",
-  };
-
   const totalPayroll = employees.reduce((acc, emp) => acc + Number(emp.basicSalary || 0), 0);
 
   return (
@@ -174,7 +169,7 @@ export default function Home() {
               value={user?.role || "Employee"} 
               onValueChange={(val: any) => updateRoleMutation.mutate({ role: val })}
             >
-              <SelectTrigger className="h-7 text-xs bg-slate-900 border-slate-700 text-blue-400 font-medium">
+              <SelectTrigger className="h-7 text-xs bg-slate-900 border-slate-700 text-blue-400 font-medium w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-slate-900 border-slate-700 text-slate-100">
@@ -214,7 +209,7 @@ export default function Home() {
             <TabsTrigger value="tenant" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg px-4 py-2 text-sm font-medium transition-all">
               <Building2 className="w-4 h-4 mr-2" /> Tenant & Company
             </TabsTrigger>
-            {["Super Admin", "Company Admin", "HR Manager", "admin"].includes(user?.role || "") && (
+            {["Super Admin", "Company Admin", "HR Manager"].includes(user?.role || "") && (
               <TabsTrigger value="audit" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg px-4 py-2 text-sm font-medium transition-all">
                 <ShieldCheck className="w-4 h-4 mr-2" /> Audit Trail
               </TabsTrigger>
@@ -310,7 +305,7 @@ export default function Home() {
                               <TableCell className="font-mono text-xs text-blue-400">{emp.employeeNo}</TableCell>
                               <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
                               <TableCell className="font-mono text-xs text-slate-400">{emp.kraPin}</TableCell>
-                              TableCell>
+                              <TableCell>
                                 <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
                                   {emp.employmentStatus}
                                 </Badge>
@@ -365,9 +360,9 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg">
               <div>
                 <h2 className="text-xl font-bold">Employee Master</h2>
-                <p className="text-sm text-slate-400">Manage employee profiles, statutory numbers (KRA PIN, NSSF, SHIF), and bank details.</p>
+                <p className="text-sm text-slate-400">Manage employee profiles, statutory numbers (KRA PIN, NSSF Number, SHIF Number), and bank details.</p>
               </div>
-              {["Super Admin", "Company Admin", "HR Manager", "admin"].includes(user?.role || "") && (
+              {["Super Admin", "Company Admin", "HR Manager"].includes(user?.role || "") && (
                 <Button onClick={() => setIsEmployeeOpen(true)} className="bg-blue-600 hover:bg-blue-500 text-white shadow-md">
                   <Plus className="w-4 h-4 mr-2" /> Add Employee
                 </Button>
@@ -378,12 +373,13 @@ export default function Home() {
               <Table>
                 <TableHeader className="bg-slate-800/50">
                   <TableRow className="border-slate-800">
-                    <TableHead className="text-slate-400">Employee No</TableHead>
+                    <TableHead className="text-slate-400">Employee Number</TableHead>
                     <TableHead className="text-slate-400">Full Name</TableHead>
                     <TableHead className="text-slate-400">KRA PIN</TableHead>
-                    <TableHead className="text-slate-400">NSSF No</TableHead>
-                    <TableHead className="text-slate-400">SHIF No</TableHead>
+                    <TableHead className="text-slate-400">NSSF Number</TableHead>
+                    <TableHead className="text-slate-400">SHIF Number</TableHead>
                     <TableHead className="text-slate-400">Basic Salary (KES)</TableHead>
+                    <TableHead className="text-slate-400">Bank Details</TableHead>
                     <TableHead className="text-slate-400">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -396,6 +392,7 @@ export default function Home() {
                       <TableCell className="font-mono text-xs text-slate-400">{emp.nssfNo || "N/A"}</TableCell>
                       <TableCell className="font-mono text-xs text-slate-400">{emp.shifNo || "N/A"}</TableCell>
                       <TableCell className="font-semibold text-emerald-400">KES {Number(emp.basicSalary).toLocaleString()}</TableCell>
+                      <TableCell className="text-xs text-slate-300">{emp.bankName ? `${emp.bankName} (${emp.accountNumber})` : "N/A"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
                           {emp.employmentStatus}
@@ -405,7 +402,7 @@ export default function Home() {
                   ))}
                   {employees.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-slate-500 py-8">
+                      <TableCell colSpan={8} className="text-center text-slate-500 py-8">
                         No employees found. Click "Add Employee" to create the first record.
                       </TableCell>
                     </TableRow>
@@ -544,7 +541,7 @@ export default function Home() {
           </TabsContent>
 
           {/* AUDIT LOG TAB */}
-          {["Super Admin", "Company Admin", "HR Manager", "admin"].includes(user?.role || "") && (
+          {["Super Admin", "Company Admin", "HR Manager"].includes(user?.role || "") && (
             <TabsContent value="audit" className="space-y-6">
               <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg">
                 <h2 className="text-xl font-bold">Audit Trail</h2>
@@ -601,7 +598,7 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle>Add Employee Master Record</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Enter employee profile details including Kenya statutory identifiers (KRA PIN, NSSF Number, SHIF Number).
+              Enter employee profile details including Kenya statutory identifiers (KRA PIN, NSSF Number, SHIF Number) and bank details.
             </DialogDescription>
           </DialogHeader>
 
@@ -670,6 +667,24 @@ export default function Home() {
               />
             </div>
             <div className="space-y-2">
+              <Label>Bank Name</Label>
+              <Input 
+                placeholder="Equity Bank" 
+                value={empForm.bankName} 
+                onChange={e => setEmpForm({...empForm, bankName: e.target.value})}
+                className="bg-slate-800 border-slate-700" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Account Number</Label>
+              <Input 
+                placeholder="0123456789012" 
+                value={empForm.accountNumber} 
+                onChange={e => setEmpForm({...empForm, accountNumber: e.target.value})}
+                className="bg-slate-800 border-slate-700" 
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Email</Label>
               <Input 
                 placeholder="john.kamau@blueprint.co.ke" 
@@ -727,6 +742,42 @@ export default function Home() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeptOpen(false)} className="bg-slate-800 border-slate-700">Cancel</Button>
             <Button onClick={() => createDeptMutation.mutate({ name: deptName })} className="bg-blue-600 hover:bg-blue-500 text-white">Create Department</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: REGISTER COMPANY */}
+      <Dialog open={isTenantOpen} onOpenChange={setIsTenantOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Register New Company</DialogTitle>
+            <DialogDescription className="text-slate-400">Provision a new multi-tenant organization.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Company Name *</Label>
+              <Input placeholder="Acme Kenya Ltd" value={companyName} onChange={e => setCompanyName(e.target.value)} className="bg-slate-800 border-slate-700" />
+            </div>
+            <div className="space-y-2">
+              <Label>KRA PIN *</Label>
+              <Input placeholder="P051234567X" value={tenantKra} onChange={e => setTenantKra(e.target.value)} className="bg-slate-800 border-slate-700 uppercase font-mono" />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input placeholder="hr@acme.co.ke" value={tenantEmail} onChange={e => setTenantEmail(e.target.value)} className="bg-slate-800 border-slate-700" />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input placeholder="+254 700 000 000" value={tenantPhone} onChange={e => setTenantPhone(e.target.value)} className="bg-slate-800 border-slate-700" />
+            </div>
+            <div className="space-y-2">
+              <Label>Physical Address</Label>
+              <Input placeholder="Nairobi, Kenya" value={tenantAddress} onChange={e => setTenantAddress(e.target.value)} className="bg-slate-800 border-slate-700" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTenantOpen(false)} className="bg-slate-800 border-slate-700">Cancel</Button>
+            <Button onClick={() => createTenantMutation.mutate({ companyName, kraPin: tenantKra, email: tenantEmail, phone: tenantPhone, address: tenantAddress })} className="bg-blue-600 hover:bg-blue-500 text-white">Register Company</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

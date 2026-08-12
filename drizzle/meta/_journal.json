@@ -8,6 +8,13 @@
       "when": 1786554795222,
       "tag": "0000_red_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1786554988748,
+      "tag": "0001_spooky_longshot",
+      "breakpoints": true
     }
   ]
 }

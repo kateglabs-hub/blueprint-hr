@@ -6,7 +6,7 @@ import {
   Tenant, InsertTenant, Company, InsertCompany, Branch, InsertBranch, Department, InsertDepartment,
   Designation, InsertDesignation, Grade, InsertGrade, EmploymentType, InsertEmploymentType,
   Employee, InsertEmployee, AuditLog, InsertAuditLog,
-  payrollPeriods, taxBrackets, taxReliefs, nssfRates, shifRates, housingLevyRates,
+  payrollPeriods, payrollRuns, taxBrackets, taxReliefs, nssfRates, shifRates, housingLevyRates,
   payrollTransactions, leaveTypes, leaveBalances, leaveRequests, notifications
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -31,7 +31,12 @@ export async function seedInitialData() {
   if (!db) return;
   try {
     // Check if tenant exists
-    const existingTenants = await db.select().from(tenants).limit(1);
+    let existingTenants: any[] = [];
+    try {
+      existingTenants = await db.select().from(tenants).limit(1);
+    } catch {
+      // Tables might be initializing
+    }
     if (existingTenants.length === 0) {
       await db.insert(tenants).values({
         id: 1,
@@ -648,5 +653,51 @@ export async function getEmployeePayslips(tenantId: number, employeeId: number) 
   if (!db) return [];
   return db.select().from(payrollTransactions).where(
     and(eq(payrollTransactions.tenantId, tenantId), eq(payrollTransactions.employeeId, employeeId))
+  );
+}
+
+export async function getNssfRates(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(nssfRates).where(eq(nssfRates.tenantId, tenantId));
+}
+
+export async function getShifRates(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(shifRates).where(eq(shifRates.tenantId, tenantId));
+}
+
+export async function updateEmployeeProfile(tenantId: number, employeeId: number, data: Partial<InsertEmployee>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(employees).set(data).where(
+    and(eq(employees.tenantId, tenantId), eq(employees.id, employeeId))
+  );
+}
+
+export async function createPayrollRun(tenantId: number, data: {
+  payrollPeriodId: number;
+  totalEmployees: number;
+  totalGross: string;
+  totalPaye: string;
+  totalNssf: string;
+  totalShif: string;
+  totalHousingLevy: string;
+  totalNet: string;
+  processedBy?: number;
+  status: 'Draft' | 'Submitted' | 'Approved' | 'Locked';
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [res] = await db.insert(payrollRuns).values({ tenantId, ...data });
+  return res.insertId;
+}
+
+export async function getPayrollRuns(tenantId: number, payrollPeriodId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(payrollRuns).where(
+    and(eq(payrollRuns.tenantId, tenantId), eq(payrollRuns.payrollPeriodId, payrollPeriodId))
   );
 }

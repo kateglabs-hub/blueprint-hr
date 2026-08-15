@@ -484,6 +484,11 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         return await db.getPayrollTransactions(ctx.tenantId, input.payrollPeriodId);
       }),
+    runs: tenantProcedure
+      .input(z.object({ payrollPeriodId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        return await db.getPayrollRuns(ctx.tenantId, input.payrollPeriodId);
+      }),
     processRun: tenantProcedure
       .input(z.object({ payrollPeriodId: z.number() }))
       .mutation(async ({ ctx, input }) => {
@@ -493,25 +498,49 @@ export const appRouter = router({
         const emps = await db.getEmployees(ctx.tenantId);
         const brackets = await db.getTaxBrackets(ctx.tenantId);
         const [relief] = await db.getTaxReliefs(ctx.tenantId);
-        const [housing] = await db.getHousingLevyRates(ctx.tenantId);
+        const [housingRate] = await db.getHousingLevyRates(ctx.tenantId);
+        const nssfList = await db.getNssfRates(ctx.tenantId);
+        const shifList = await db.getShifRates(ctx.tenantId);
+
+        let sumGross = 0;
+        let sumPaye = 0;
+        let sumNssf = 0;
+        let sumShif = 0;
+        let sumHousing = 0;
+        let sumNet = 0;
+        let activeCount = 0;
 
         for (const emp of emps) {
           if (emp.employmentStatus !== 'Active') continue;
+          activeCount++;
           const basic = Number(emp.basicSalary);
-          const gross = basic; // expandable with allowances
+          const gross = basic;
           
-          // NSSF Tier calculation (simplified standard Kenya Tier I & II limit calculation)
-          const nssf = Math.min(gross * 0.06, 2160); // Max NSSF tier limit approx
+          // Dynamic NSSF calculation from DB rate tiers
+          let nssf = 0;
+          const tier1 = nssfList.find(n => n.tierName === 'Tier I');
+          const tier2 = nssfList.find(n => n.tierName === 'Tier II');
+          const t1Limit = tier1 ? Number(tier1.upperLimit) : 7000;
+          const t2Limit = tier2 ? Number(tier2.upperLimit) : 36000;
+          const employeeRate = tier1 ? Number(tier1.employeeRate) : 0.06;
+
+          if (gross <= t1Limit) {
+            nssf = gross * employeeRate;
+          } else {
+            const t1Amount = t1Limit * employeeRate;
+            const t2Amount = Math.min(gross - t1Limit, t2Limit - t1Limit) * employeeRate;
+            nssf = t1Amount + t2Amount;
+          }
+
           const taxableBeforeRelief = Math.max(0, gross - nssf);
 
-          // PAYE calculation across brackets
+          // PAYE calculation across DB tax brackets
           let remaining = taxableBeforeRelief;
           let payeCalc = 0;
-          let prevLimit = 0;
           for (const b of brackets) {
             const upper = b.upperLimit ? Number(b.upperLimit) : Infinity;
-            const width = upper - Number(b.lowerLimit) + 1;
-            const taxableInBand = Math.min(Math.max(0, remaining), upper - Number(b.lowerLimit));
+            const lower = Number(b.lowerLimit);
+            const taxableInBand = Math.min(Math.max(0, remaining), upper - lower);
             payeCalc += taxableInBand * Number(b.rate);
             remaining -= taxableInBand;
             if (remaining <= 0) break;
@@ -520,14 +549,24 @@ export const appRouter = router({
           const personalReliefVal = relief ? Number(relief.monthlyAmount) : 2400;
           const finalPaye = Math.max(0, payeCalc - personalReliefVal);
 
-          // SHIF (2.75% of gross)
-          const shif = Math.max(300, gross * 0.0275);
+          // SHIF calculation from DB rate (e.g. 2.75% with 300 min)
+          const shifPercentage = shifList.length > 0 ? Number(shifList[0].percentage) : 0.0275;
+          const shifMin = shifList.length > 0 ? Number(shifList[0].minAmount) : 300;
+          const shif = Math.max(shifMin, gross * shifPercentage);
 
-          // Housing Levy (1.5% of gross)
-          const housingLevy = gross * 0.015;
+          // Housing Levy calculation from DB rate (e.g. 1.5%)
+          const housingPct = housingRate ? Number(housingRate.employeePercentage) : 0.015;
+          const housingLevy = gross * housingPct;
 
           const totalDeductions = nssf + finalPaye + shif + housingLevy;
           const netPay = Math.max(0, gross - totalDeductions);
+
+          sumGross += gross;
+          sumPaye += finalPaye;
+          sumNssf += nssf;
+          sumShif += shif;
+          sumHousing += housingLevy;
+          sumNet += netPay;
 
           // Upsert payroll transaction
           await db.upsertPayrollTransaction(ctx.tenantId, {
@@ -549,6 +588,20 @@ export const appRouter = router({
           });
         }
 
+        // Record payroll run summary
+        await db.createPayrollRun(ctx.tenantId, {
+          payrollPeriodId: input.payrollPeriodId,
+          totalEmployees: activeCount,
+          totalGross: sumGross.toFixed(2),
+          totalPaye: sumPaye.toFixed(2),
+          totalNssf: sumNssf.toFixed(2),
+          totalShif: sumShif.toFixed(2),
+          totalHousingLevy: sumHousing.toFixed(2),
+          totalNet: sumNet.toFixed(2),
+          processedBy: ctx.user.id,
+          status: "Approved"
+        });
+
         await db.createAuditLog({
           tenantId: ctx.tenantId,
           userId: ctx.user.id,
@@ -556,7 +609,7 @@ export const appRouter = router({
           action: "PROCESS",
           entityType: "PayrollPeriod",
           entityId: input.payrollPeriodId,
-          details: `Processed payroll run for period ID ${input.payrollPeriodId} with Kenyan statutory calculations.`,
+          details: `Processed dynamic Kenyan payroll run for period ID ${input.payrollPeriodId} (${activeCount} employees).`,
         });
 
         return { success: true };

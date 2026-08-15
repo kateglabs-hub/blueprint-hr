@@ -235,6 +235,24 @@ export const payrollPeriods = mysqlTable("payroll_periods", {
   tenantIdx: index("tenant_idx").on(table.tenantId),
 }));
 
+export const payrollRuns = mysqlTable("payroll_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  payrollPeriodId: int("payrollPeriodId").notNull(),
+  totalEmployees: int("totalEmployees").notNull(),
+  totalGross: decimal("totalGross", { precision: 15, scale: 2 }).notNull(),
+  totalPaye: decimal("totalPaye", { precision: 15, scale: 2 }).notNull(),
+  totalNssf: decimal("totalNssf", { precision: 15, scale: 2 }).notNull(),
+  totalShif: decimal("totalShif", { precision: 15, scale: 2 }).notNull(),
+  totalHousingLevy: decimal("totalHousingLevy", { precision: 15, scale: 2 }).notNull(),
+  totalNet: decimal("totalNet", { precision: 15, scale: 2 }).notNull(),
+  processedBy: int("processedBy"),
+  status: mysqlEnum("status", ["Draft", "Submitted", "Approved", "Locked"]).default("Draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
 export const taxBrackets = mysqlTable("tax_brackets", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),

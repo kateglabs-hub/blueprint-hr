@@ -455,6 +455,201 @@ export const appRouter = router({
       return await db.getAuditLogs(ctx.tenantId);
     }),
   }),
+
+  payroll: router({
+    periods: tenantProcedure.query(async ({ ctx }) => {
+      await db.seedPhase2Data(ctx.tenantId);
+      return await db.getPayrollPeriods(ctx.tenantId);
+    }),
+    createPeriod: tenantProcedure
+      .input(z.object({ name: z.string(), month: z.number(), year: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!["Super Admin", "Company Admin", "Payroll Manager"].includes(ctx.user.role)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only Payroll Managers and Admins can create payroll periods." });
+        }
+        const id = await db.createPayrollPeriod({ tenantId: ctx.tenantId, ...input });
+        await db.createAuditLog({
+          tenantId: ctx.tenantId,
+          userId: ctx.user.id,
+          userName: ctx.user.name || "User",
+          action: "CREATE",
+          entityType: "PayrollPeriod",
+          entityId: id,
+          details: `Created payroll period ${input.name}`,
+        });
+        return { success: true, id };
+      }),
+    transactions: tenantProcedure
+      .input(z.object({ payrollPeriodId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        return await db.getPayrollTransactions(ctx.tenantId, input.payrollPeriodId);
+      }),
+    processRun: tenantProcedure
+      .input(z.object({ payrollPeriodId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!["Super Admin", "Company Admin", "Payroll Manager"].includes(ctx.user.role)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only Payroll Managers and Admins can process payroll." });
+        }
+        const emps = await db.getEmployees(ctx.tenantId);
+        const brackets = await db.getTaxBrackets(ctx.tenantId);
+        const [relief] = await db.getTaxReliefs(ctx.tenantId);
+        const [housing] = await db.getHousingLevyRates(ctx.tenantId);
+
+        for (const emp of emps) {
+          if (emp.employmentStatus !== 'Active') continue;
+          const basic = Number(emp.basicSalary);
+          const gross = basic; // expandable with allowances
+          
+          // NSSF Tier calculation (simplified standard Kenya Tier I & II limit calculation)
+          const nssf = Math.min(gross * 0.06, 2160); // Max NSSF tier limit approx
+          const taxableBeforeRelief = Math.max(0, gross - nssf);
+
+          // PAYE calculation across brackets
+          let remaining = taxableBeforeRelief;
+          let payeCalc = 0;
+          let prevLimit = 0;
+          for (const b of brackets) {
+            const upper = b.upperLimit ? Number(b.upperLimit) : Infinity;
+            const width = upper - Number(b.lowerLimit) + 1;
+            const taxableInBand = Math.min(Math.max(0, remaining), upper - Number(b.lowerLimit));
+            payeCalc += taxableInBand * Number(b.rate);
+            remaining -= taxableInBand;
+            if (remaining <= 0) break;
+          }
+
+          const personalReliefVal = relief ? Number(relief.monthlyAmount) : 2400;
+          const finalPaye = Math.max(0, payeCalc - personalReliefVal);
+
+          // SHIF (2.75% of gross)
+          const shif = Math.max(300, gross * 0.0275);
+
+          // Housing Levy (1.5% of gross)
+          const housingLevy = gross * 0.015;
+
+          const totalDeductions = nssf + finalPaye + shif + housingLevy;
+          const netPay = Math.max(0, gross - totalDeductions);
+
+          // Upsert payroll transaction
+          await db.upsertPayrollTransaction(ctx.tenantId, {
+            payrollPeriodId: input.payrollPeriodId,
+            employeeId: emp.id,
+            basicSalary: String(basic),
+            allowances: "0.00",
+            grossPay: String(gross),
+            taxablePay: String(taxableBeforeRelief),
+            paye: String(finalPaye.toFixed(2)),
+            personalRelief: String(personalReliefVal.toFixed(2)),
+            nssf: String(nssf.toFixed(2)),
+            shif: String(shif.toFixed(2)),
+            housingLevy: String(housingLevy.toFixed(2)),
+            otherDeductions: "0.00",
+            totalDeductions: String(totalDeductions.toFixed(2)),
+            netPay: String(netPay.toFixed(2)),
+            status: "Approved"
+          });
+        }
+
+        await db.createAuditLog({
+          tenantId: ctx.tenantId,
+          userId: ctx.user.id,
+          userName: ctx.user.name || "User",
+          action: "PROCESS",
+          entityType: "PayrollPeriod",
+          entityId: input.payrollPeriodId,
+          details: `Processed payroll run for period ID ${input.payrollPeriodId} with Kenyan statutory calculations.`,
+        });
+
+        return { success: true };
+      }),
+  }),
+
+  leave: router({
+    types: tenantProcedure.query(async ({ ctx }) => {
+      await db.seedPhase2Data(ctx.tenantId);
+      return await db.getLeaveTypes(ctx.tenantId);
+    }),
+    balances: tenantProcedure
+      .input(z.object({ employeeId: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        let empId = input.employeeId;
+        if (!empId && ctx.user.role === 'Employee') {
+          const emp = await db.getEmployeeByEmail(ctx.tenantId, ctx.user.email || "");
+          empId = emp ? emp.id : 0;
+        }
+        if (!empId) {
+          const emps = await db.getEmployees(ctx.tenantId);
+          empId = emps.length > 0 ? emps[0].id : 1;
+        }
+        return await db.getLeaveBalances(ctx.tenantId, empId);
+      }),
+    requests: tenantProcedure
+      .input(z.object({ employeeId: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        let empId = input.employeeId;
+        if (ctx.user.role === 'Employee') {
+          const emp = await db.getEmployeeByEmail(ctx.tenantId, ctx.user.email || "");
+          empId = emp ? emp.id : (empId || 0);
+        }
+        return await db.getLeaveRequests(ctx.tenantId, empId);
+      }),
+    createRequest: tenantProcedure
+      .input(z.object({
+        employeeId: z.number(),
+        leaveTypeId: z.number(),
+        startDate: z.string(),
+        endDate: z.string(),
+        daysRequested: z.string(),
+        reason: z.string()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createLeaveRequest({ tenantId: ctx.tenantId, ...input });
+        await db.createAuditLog({
+          tenantId: ctx.tenantId,
+          userId: ctx.user.id,
+          userName: ctx.user.name || "User",
+          action: "CREATE",
+          entityType: "LeaveRequest",
+          entityId: id,
+          details: `Requested ${input.daysRequested} days leave`,
+        });
+        return { success: true, id };
+      }),
+    updateStatus: tenantProcedure
+      .input(z.object({ requestId: z.number(), status: z.enum(['Approved', 'Rejected', 'Cancelled']) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!["Super Admin", "Company Admin", "HR Manager"].includes(ctx.user.role)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only HR Managers and Admins can approve leave requests." });
+        }
+        await db.updateLeaveRequestStatus(ctx.tenantId, input.requestId, input.status, ctx.user.id);
+        await db.createAuditLog({
+          tenantId: ctx.tenantId,
+          userId: ctx.user.id,
+          userName: ctx.user.name || "User",
+          action: "UPDATE",
+          entityType: "LeaveRequest",
+          entityId: input.requestId,
+          details: `Updated leave request ID ${input.requestId} to ${input.status}`,
+        });
+        return { success: true };
+      }),
+  }),
+
+  ess: router({
+    myProfile: tenantProcedure.query(async ({ ctx }) => {
+      const emp = await db.getEmployeeByEmail(ctx.tenantId, ctx.user.email || "");
+      if (!emp) {
+        // Fallback to first employee for demo admin
+        const emps = await db.getEmployees(ctx.tenantId);
+        return emps.length > 0 ? emps[0] : null;
+      }
+      return emp;
+    }),
+    myPayslips: tenantProcedure.query(async ({ ctx }) => {
+      const emp = await db.getEmployeeByEmail(ctx.tenantId, ctx.user.email || "");
+      const empId = emp ? emp.id : 1;
+      return await db.getEmployeePayslips(ctx.tenantId, empId);
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

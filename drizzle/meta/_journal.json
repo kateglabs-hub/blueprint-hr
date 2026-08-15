@@ -22,6 +22,13 @@
       "when": 1786568486681,
       "tag": "0002_cooing_grandmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1786817493813,
+      "tag": "0003_gigantic_the_initiative",
+      "breakpoints": true
     }
   ]
 }

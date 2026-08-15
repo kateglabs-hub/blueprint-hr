@@ -5,7 +5,9 @@ import {
   employmentTypes, employees, auditLogs,
   Tenant, InsertTenant, Company, InsertCompany, Branch, InsertBranch, Department, InsertDepartment,
   Designation, InsertDesignation, Grade, InsertGrade, EmploymentType, InsertEmploymentType,
-  Employee, InsertEmployee, AuditLog, InsertAuditLog
+  Employee, InsertEmployee, AuditLog, InsertAuditLog,
+  payrollPeriods, taxBrackets, taxReliefs, nssfRates, shifRates, housingLevyRates,
+  payrollTransactions, leaveTypes, leaveBalances, leaveRequests, notifications
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, hashPassword, localOpenIdForEmail } from './auth';
@@ -400,4 +402,251 @@ export async function getAuditLogs(tenantId: number) {
   const db = await getDb();
   if (!db) return [];
   return await db.select().from(auditLogs).where(eq(auditLogs.tenantId, tenantId)).orderBy(desc(auditLogs.createdAt)).limit(100);
+}
+
+// --- Phase 2: Statutory & Payroll Seed & Helpers ---
+
+export async function seedPhase2Data(tenantId: number) {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    // Check tax brackets
+    const brackets = await db.select().from(taxBrackets).where(eq(taxBrackets.tenantId, tenantId)).limit(1);
+    if (brackets.length === 0) {
+      // Kenya PAYE brackets 2024/2025/2026: 10% on first 24,000, 25% on next 8,000, 30% on next 468,000, 32.5% on next 300,000, 35% above
+      await db.insert(taxBrackets).values([
+        { tenantId, bandOrder: 1, lowerLimit: "0", upperLimit: "24000", rate: "0.1000" },
+        { tenantId, bandOrder: 2, lowerLimit: "24001", upperLimit: "32333", rate: "0.2500" },
+        { tenantId, bandOrder: 3, lowerLimit: "32334", upperLimit: "500000", rate: "0.3000" },
+        { tenantId, bandOrder: 4, lowerLimit: "500001", upperLimit: "800000", rate: "0.3250" },
+        { tenantId, bandOrder: 5, lowerLimit: "800001", upperLimit: null, rate: "0.3500" },
+      ]);
+      await db.insert(taxReliefs).values([
+        { tenantId, reliefName: "Personal Relief", monthlyAmount: "2400.00" },
+        { tenantId, reliefName: "Insurance Relief", monthlyAmount: "240.00" },
+      ]);
+      await db.insert(nssfRates).values([
+        { tenantId, tierName: "Tier I", lowerLimit: "0", upperLimit: "8000", employeeRate: "0.0600", employerRate: "0.0600" },
+        { tenantId, tierName: "Tier II", lowerLimit: "8001", upperLimit: "72000", employeeRate: "0.0600", employerRate: "0.0600" },
+      ]);
+      await db.insert(shifRates).values([
+        { tenantId, percentage: "0.0275", minAmount: "300.00" },
+      ]);
+      await db.insert(housingLevyRates).values([
+        { tenantId, employeePercentage: "0.0150", employerPercentage: "0.0150" },
+      ]);
+      await db.insert(leaveTypes).values([
+        { tenantId, name: "Annual Leave", defaultDays: 21, paid: "Yes", description: "Standard annual paid leave" },
+        { tenantId, name: "Sick Leave", defaultDays: 14, paid: "Yes", description: "Paid sick leave with medical certificate" },
+        { tenantId, name: "Compassionate Leave", defaultDays: 5, paid: "Yes", description: "For bereavement or family emergency" },
+        { tenantId, name: "Maternity Leave", defaultDays: 90, paid: "Yes", description: "Paid maternity leave for female employees" },
+        { tenantId, name: "Paternity Leave", defaultDays: 14, paid: "Yes", description: "Paid paternity leave for male employees" },
+        { tenantId, name: "Study Leave", defaultDays: 10, paid: "No", description: "Unpaid or study-supported leave" },
+      ]);
+      // Seed leave balances for existing employees (id 1 and 2)
+      const allEmps = await db.select().from(employees).where(eq(employees.tenantId, tenantId));
+      const types = await db.select().from(leaveTypes).where(eq(leaveTypes.tenantId, tenantId));
+      for (const emp of allEmps) {
+        for (const lt of types) {
+          await db.insert(leaveBalances).values({
+            tenantId,
+            employeeId: emp.id,
+            leaveTypeId: lt.id,
+            year: new Date().getFullYear(),
+            allocatedDays: String(lt.defaultDays),
+            usedDays: "0.00",
+            carriedForward: "0.00"
+          });
+        }
+      }
+      // Seed a default open payroll period for August 2026
+      await db.insert(payrollPeriods).values({
+        tenantId,
+        name: "August 2026",
+        month: 8,
+        year: 2026,
+        status: "Open"
+      });
+    }
+  } catch (err) {
+    console.error("[Database] Phase 2 seed error:", err);
+  }
+}
+
+// Payroll Helpers
+export async function getPayrollPeriods(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(payrollPeriods).where(eq(payrollPeriods.tenantId, tenantId));
+}
+
+export async function createPayrollPeriod(data: { tenantId: number; name: string; month: number; year: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [res] = await db.insert(payrollPeriods).values({ ...data, status: "Open" });
+  return res.insertId;
+}
+
+export async function getPayrollTransactions(tenantId: number, payrollPeriodId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(payrollTransactions).where(
+    and(eq(payrollTransactions.tenantId, tenantId), eq(payrollTransactions.payrollPeriodId, payrollPeriodId))
+  );
+}
+
+// Leave Helpers
+export async function getLeaveTypes(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(leaveTypes).where(eq(leaveTypes.tenantId, tenantId));
+}
+
+export async function getLeaveBalances(tenantId: number, employeeId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(leaveBalances).where(
+    and(eq(leaveBalances.tenantId, tenantId), eq(leaveBalances.employeeId, employeeId))
+  );
+}
+
+export async function getLeaveRequests(tenantId: number, employeeId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (employeeId) {
+    return db.select().from(leaveRequests).where(
+      and(eq(leaveRequests.tenantId, tenantId), eq(leaveRequests.employeeId, employeeId))
+    );
+  }
+  return db.select().from(leaveRequests).where(eq(leaveRequests.tenantId, tenantId));
+}
+
+export async function createLeaveRequest(data: {
+  tenantId: number;
+  employeeId: number;
+  leaveTypeId: number;
+  startDate: string;
+  endDate: string;
+  daysRequested: string;
+  reason: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [res] = await db.insert(leaveRequests).values({
+    ...data,
+    startDate: data.startDate as any,
+    endDate: data.endDate as any,
+    status: "Pending"
+  });
+  return res.insertId;
+}
+
+export async function updateLeaveRequestStatus(tenantId: number, requestId: number, status: 'Approved' | 'Rejected' | 'Cancelled', approvedBy: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(leaveRequests).set({
+    status,
+    approvedBy,
+    approvedAt: new Date()
+  }).where(and(eq(leaveRequests.tenantId, tenantId), eq(leaveRequests.id, requestId)));
+
+  // If approved, deduct from leave balance
+  if (status === 'Approved') {
+    const [req] = await db.select().from(leaveRequests).where(eq(leaveRequests.id, requestId)).limit(1);
+    if (req) {
+      const [bal] = await db.select().from(leaveBalances).where(
+        and(eq(leaveBalances.tenantId, tenantId), eq(leaveBalances.employeeId, req.employeeId), eq(leaveBalances.leaveTypeId, req.leaveTypeId))
+      ).limit(1);
+      if (bal) {
+        const newUsed = Number(bal.usedDays) + Number(req.daysRequested);
+        await db.update(leaveBalances).set({ usedDays: String(newUsed) }).where(eq(leaveBalances.id, bal.id));
+      }
+    }
+  }
+}
+
+// Notifications Helpers
+export async function getNotifications(tenantId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(notifications).where(
+    and(eq(notifications.tenantId, tenantId), eq(notifications.userId, userId))
+  );
+}
+
+export async function createNotification(data: { tenantId: number; userId: number; title: string; message: string }) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(notifications).values({ ...data, isRead: 0 });
+}
+
+// Additional helper functions for Phase 2 routers
+export async function getTaxBrackets(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(taxBrackets).where(eq(taxBrackets.tenantId, tenantId)).orderBy(taxBrackets.bandOrder);
+}
+
+export async function getTaxReliefs(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(taxReliefs).where(eq(taxReliefs.tenantId, tenantId));
+}
+
+export async function getHousingLevyRates(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(housingLevyRates).where(eq(housingLevyRates.tenantId, tenantId));
+}
+
+export async function getEmployeeByEmail(tenantId: number, email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const res = await db.select().from(employees).where(
+    and(eq(employees.tenantId, tenantId), eq(employees.email, email.trim().toLowerCase()))
+  ).limit(1);
+  return res.length > 0 ? res[0] : undefined;
+}
+
+export async function upsertPayrollTransaction(tenantId: number, data: {
+  payrollPeriodId: number;
+  employeeId: number;
+  basicSalary: string;
+  allowances: string;
+  grossPay: string;
+  taxablePay: string;
+  paye: string;
+  personalRelief: string;
+  nssf: string;
+  shif: string;
+  housingLevy: string;
+  otherDeductions: string;
+  totalDeductions: string;
+  netPay: string;
+  status: 'Draft' | 'Approved' | 'Paid';
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  // Check existing
+  const existing = await db.select().from(payrollTransactions).where(
+    and(
+      eq(payrollTransactions.tenantId, tenantId),
+      eq(payrollTransactions.payrollPeriodId, data.payrollPeriodId),
+      eq(payrollTransactions.employeeId, data.employeeId)
+    )
+  ).limit(1);
+
+  if (existing.length > 0) {
+    await db.update(payrollTransactions).set(data).where(eq(payrollTransactions.id, existing[0].id));
+  } else {
+    await db.insert(payrollTransactions).values({ tenantId, ...data });
+  }
+}
+
+export async function getEmployeePayslips(tenantId: number, employeeId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(payrollTransactions).where(
+    and(eq(payrollTransactions.tenantId, tenantId), eq(payrollTransactions.employeeId, employeeId))
+  );
 }

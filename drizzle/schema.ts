@@ -217,3 +217,154 @@ export type InsertEmployee = typeof employees.$inferInsert;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+
+// --- Phase 2: Payroll, Statutory Rates, Leave & ESS ---
+
+export const payrollPeriods = mysqlTable("payroll_periods", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(), // e.g. "August 2026"
+  month: int("month").notNull(), // 1-12
+  year: int("year").notNull(), // 2026
+  status: mysqlEnum("status", ["Open", "Processing", "Approved", "Locked"]).default("Open").notNull(),
+  processedAt: timestamp("processedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const taxBrackets = mysqlTable("tax_brackets", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  bandOrder: int("bandOrder").notNull(),
+  lowerLimit: decimal("lowerLimit", { precision: 12, scale: 2 }).notNull(),
+  upperLimit: decimal("upperLimit", { precision: 12, scale: 2 }), // null for infinite
+  rate: decimal("rate", { precision: 5, scale: 4 }).notNull(), // e.g. 0.1000 for 10%
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const taxReliefs = mysqlTable("tax_reliefs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  reliefName: varchar("reliefName", { length: 100 }).notNull(), // e.g. "Personal Relief", "Insurance Relief"
+  monthlyAmount: decimal("monthlyAmount", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const nssfRates = mysqlTable("nssf_rates", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  tierName: varchar("tierName", { length: 50 }).notNull(), // "Tier I", "Tier II"
+  lowerLimit: decimal("lowerLimit", { precision: 10, scale: 2 }).notNull(),
+  upperLimit: decimal("upperLimit", { precision: 10, scale: 2 }).notNull(),
+  employeeRate: decimal("employeeRate", { precision: 5, scale: 4 }).notNull(), // e.g. 0.0600
+  employerRate: decimal("employerRate", { precision: 5, scale: 4 }).notNull(), // e.g. 0.0600
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const shifRates = mysqlTable("shif_rates", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  percentage: decimal("percentage", { precision: 5, scale: 4 }).notNull(), // e.g. 0.0275 for 2.75%
+  minAmount: decimal("minAmount", { precision: 10, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const housingLevyRates = mysqlTable("housing_levy_rates", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  employeePercentage: decimal("employeePercentage", { precision: 5, scale: 4 }).notNull(), // e.g. 0.0150 for 1.5%
+  employerPercentage: decimal("employerPercentage", { precision: 5, scale: 4 }).notNull(), // e.g. 0.0150
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const payrollTransactions = mysqlTable("payroll_transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  payrollPeriodId: int("payrollPeriodId").notNull(),
+  employeeId: int("employeeId").notNull(),
+  basicSalary: decimal("basicSalary", { precision: 12, scale: 2 }).notNull(),
+  allowances: decimal("allowances", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  grossPay: decimal("grossPay", { precision: 12, scale: 2 }).notNull(),
+  taxablePay: decimal("taxablePay", { precision: 12, scale: 2 }).notNull(),
+  paye: decimal("paye", { precision: 12, scale: 2 }).notNull(),
+  personalRelief: decimal("personalRelief", { precision: 12, scale: 2 }).notNull(),
+  nssf: decimal("nssf", { precision: 12, scale: 2 }).notNull(),
+  shif: decimal("shif", { precision: 12, scale: 2 }).notNull(),
+  housingLevy: decimal("housingLevy", { precision: 12, scale: 2 }).notNull(),
+  otherDeductions: decimal("otherDeductions", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  totalDeductions: decimal("totalDeductions", { precision: 12, scale: 2 }).notNull(),
+  netPay: decimal("netPay", { precision: 12, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["Draft", "Approved", "Paid"]).default("Draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const leaveTypes = mysqlTable("leave_types", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(), // Annual, Sick, Compassionate, Maternity, Paternity, Study
+  defaultDays: int("defaultDays").notNull(),
+  paid: mysqlEnum("paid", ["Yes", "No"]).default("Yes").notNull(),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const leaveBalances = mysqlTable("leave_balances", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  employeeId: int("employeeId").notNull(),
+  leaveTypeId: int("leaveTypeId").notNull(),
+  year: int("year").notNull(),
+  allocatedDays: decimal("allocatedDays", { precision: 5, scale: 2 }).notNull(),
+  usedDays: decimal("usedDays", { precision: 5, scale: 2 }).default("0.00").notNull(),
+  carriedForward: decimal("carriedForward", { precision: 5, scale: 2 }).default("0.00").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const leaveRequests = mysqlTable("leave_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  employeeId: int("employeeId").notNull(),
+  leaveTypeId: int("leaveTypeId").notNull(),
+  startDate: date("startDate").notNull(),
+  endDate: date("endDate").notNull(),
+  daysRequested: decimal("daysRequested", { precision: 5, scale: 2 }).notNull(),
+  reason: text("reason").notNull(),
+  status: mysqlEnum("status", ["Pending", "Approved", "Rejected", "Cancelled"]).default("Pending").notNull(),
+  approvedBy: int("approvedBy"),
+  approvedAt: timestamp("approvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 150 }).notNull(),
+  message: text("message").notNull(),
+  isRead: int("isRead").default(0).notNull(), // 0 unread, 1 read
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));

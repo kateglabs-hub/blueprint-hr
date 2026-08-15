@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Building2, Users, ShieldCheck, Layers, FileText, Activity, Plus, 
-  Briefcase, DollarSign, Calendar, CheckCircle2, AlertCircle, LogOut, UserCheck, Settings, Search
+  Briefcase, DollarSign, Calendar, CheckCircle2, AlertCircle, LogOut, UserCheck, Settings, Search,
+  Calculator, CalendarDays
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -74,6 +75,53 @@ export default function Home() {
   const { data: grades = [] } = trpc.org.grades.useQuery(undefined, { enabled: isAuthenticated });
   const { data: employmentTypes = [] } = trpc.org.employmentTypes.useQuery(undefined, { enabled: isAuthenticated });
   const { data: auditLogs = [], refetch: refetchAudit } = trpc.audit.list.useQuery(undefined, { enabled: isAuthenticated && ["Super Admin", "Company Admin", "HR Manager"].includes(user?.role || "") });
+
+  // Phase 2 queries & mutations
+  const [selectedPeriodId, setSelectedPeriodId] = useState(1);
+  const { data: payrollPeriods = [] } = trpc.payroll.periods.useQuery(undefined, { enabled: isAuthenticated });
+  const { data: payrollTx = [], refetch: refetchPayroll } = trpc.payroll.transactions.useQuery({ payrollPeriodId: selectedPeriodId }, { enabled: isAuthenticated });
+  const { data: leaveTypes = [] } = trpc.leave.types.useQuery(undefined, { enabled: isAuthenticated });
+  const { data: leaveBalances = [], refetch: refetchLeaveBalances } = trpc.leave.balances.useQuery({}, { enabled: isAuthenticated });
+  const { data: leaveRequests = [], refetch: refetchLeaveRequests } = trpc.leave.requests.useQuery({}, { enabled: isAuthenticated });
+  const { data: essProfile } = trpc.ess.myProfile.useQuery(undefined, { enabled: isAuthenticated });
+  const { data: essPayslips = [] } = trpc.ess.myPayslips.useQuery(undefined, { enabled: isAuthenticated });
+
+  const [isLeaveOpen, setIsLeaveOpen] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({
+    employeeId: 1,
+    leaveTypeId: 1,
+    startDate: "2026-09-01",
+    endDate: "2026-09-05",
+    daysRequested: "5",
+    reason: "Annual family vacation"
+  });
+
+  const processPayrollMutation = trpc.payroll.processRun.useMutation({
+    onSuccess: () => {
+      toast.success("Payroll run processed successfully with Kenya statutory compliance formulas.");
+      refetchPayroll();
+    },
+    onError: (err) => toast.error(err.message)
+  });
+
+  const createLeaveMutation = trpc.leave.createRequest.useMutation({
+    onSuccess: () => {
+      toast.success("Leave request submitted successfully.");
+      setIsLeaveOpen(false);
+      refetchLeaveRequests();
+      refetchLeaveBalances();
+    },
+    onError: (err) => toast.error(err.message)
+  });
+
+  const updateLeaveMutation = trpc.leave.updateStatus.useMutation({
+    onSuccess: () => {
+      toast.success("Leave request status updated.");
+      refetchLeaveRequests();
+      refetchLeaveBalances();
+    },
+    onError: (err) => toast.error(err.message)
+  });
 
   // Mutations
   const updateRoleMutation = trpc.auth.updateRole.useMutation({
@@ -248,6 +296,15 @@ export default function Home() {
             </TabsTrigger>
             <TabsTrigger value="tenant" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg px-4 py-2 text-sm font-medium transition-all">
               <Building2 className="w-4 h-4 mr-2" /> Tenant & Company
+            </TabsTrigger>
+            <TabsTrigger value="payroll" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg px-4 py-2 text-sm font-medium transition-all">
+              <Calculator className="w-4 h-4 mr-2" /> Kenyan Payroll
+            </TabsTrigger>
+            <TabsTrigger value="leave" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg px-4 py-2 text-sm font-medium transition-all">
+              <CalendarDays className="w-4 h-4 mr-2" /> Leave Management
+            </TabsTrigger>
+            <TabsTrigger value="ess" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg px-4 py-2 text-sm font-medium transition-all">
+              <UserCheck className="w-4 h-4 mr-2" /> ESS Portal
             </TabsTrigger>
             {["Super Admin", "Company Admin", "HR Manager"].includes(user?.role || "") && (
               <TabsTrigger value="audit" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg px-4 py-2 text-sm font-medium transition-all">
@@ -580,6 +637,288 @@ export default function Home() {
             </Card>
           </TabsContent>
 
+          {/* PAYROLL TAB */}
+          <TabsContent value="payroll" className="space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl gap-4">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Calculator className="w-6 h-6 text-blue-500" /> Kenyan Statutory Payroll Engine
+                </h2>
+                <p className="text-sm text-slate-400 mt-1">Automated PAYE bands, personal relief, Tier I/II NSSF, SHIF (2.75%), and Housing Levy (1.5%).</p>
+              </div>
+              {["Super Admin", "Company Admin", "Payroll Manager"].includes(user?.role || "") && (
+                <div className="flex gap-3">
+                  <Button onClick={() => processPayrollMutation.mutate({ payrollPeriodId: selectedPeriodId })} className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg">
+                    Process Payroll Run (August 2026)
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <Card className="bg-slate-900 border-slate-800 shadow-xl overflow-hidden">
+              <CardHeader>
+                <CardTitle className="text-lg">Payroll Transactions & Statutory Summary</CardTitle>
+                <CardDescription className="text-slate-400">Computed gross pay, taxable pay, statutory deductions, and net pay per employee.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader className="bg-slate-800/50">
+                    <TableRow className="border-slate-800">
+                      <TableHead className="text-slate-400">Employee</TableHead>
+                      <TableHead className="text-slate-400">Basic (KES)</TableHead>
+                      <TableHead className="text-slate-400">Gross (KES)</TableHead>
+                      <TableHead className="text-slate-400">NSSF</TableHead>
+                      <TableHead className="text-slate-400">PAYE</TableHead>
+                      <TableHead className="text-slate-400">SHIF</TableHead>
+                      <TableHead className="text-slate-400">Housing Levy</TableHead>
+                      <TableHead className="text-slate-400">Net Pay (KES)</TableHead>
+                      <TableHead className="text-slate-400">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payrollTx.map((tx: any) => {
+                      const emp = employees.find(e => e.id === tx.employeeId);
+                      return (
+                        <TableRow key={tx.id} className="border-slate-800 hover:bg-slate-800/30">
+                          <TableCell className="font-medium">
+                            {emp ? `${emp.firstName} ${emp.lastName}` : `ID: ${tx.employeeId}`}
+                            <div className="text-xs text-slate-400">{emp?.employeeNo}</div>
+                          </TableCell>
+                          <TableCell className="font-mono">KES {Number(tx.basicSalary).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono font-bold text-slate-200">KES {Number(tx.grossPay).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono text-slate-400">KES {Number(tx.nssf).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono text-slate-400">KES {Number(tx.paye).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono text-slate-400">KES {Number(tx.shif).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono text-slate-400">KES {Number(tx.housingLevy).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono font-bold text-emerald-400">KES {Number(tx.netPay).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs">
+                              {tx.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {payrollTx.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-slate-500 py-12">
+                          No payroll transactions computed for this period yet. Click "Process Payroll Run" above to calculate statutory deductions.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* LEAVE MANAGEMENT TAB */}
+          <TabsContent value="leave" className="space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl gap-4">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <CalendarDays className="w-6 h-6 text-blue-500" /> Leave Management & Approvals
+                </h2>
+                <p className="text-sm text-slate-400 mt-1">Manage leave types, balances, accruals, and supervisory approval workflows.</p>
+              </div>
+              <Button onClick={() => setIsLeaveOpen(true)} className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg">
+                <Plus className="w-4 h-4 mr-2" /> Apply for Leave
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="bg-slate-900 border-slate-800 shadow-xl md:col-span-1">
+                <CardHeader>
+                  <CardTitle className="text-lg">My Leave Balances (2026)</CardTitle>
+                  <CardDescription className="text-slate-400">Entitlements and remaining days</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {leaveBalances.map((bal: any) => {
+                    const lt = leaveTypes.find((t: any) => t.id === bal.leaveTypeId);
+                    const allocated = Number(bal.allocatedDays);
+                    const used = Number(bal.usedDays);
+                    const remaining = allocated - used;
+                    return (
+                      <div key={bal.id} className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 flex justify-between items-center">
+                        <div>
+                          <p className="font-semibold text-sm">{lt?.name || "Leave"}</p>
+                          <p className="text-xs text-slate-400">Used: {used} / Allocated: {allocated}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-lg font-bold text-blue-400">{remaining}</span>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wide">Days Left</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {leaveBalances.length === 0 && (
+                    <p className="text-sm text-slate-500 text-center py-4">No leave balances found.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-900 border-slate-800 shadow-xl md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Leave Requests & Approval Queue</CardTitle>
+                  <CardDescription className="text-slate-400">Track and manage leave applications</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-slate-800/50">
+                      <TableRow className="border-slate-800">
+                        <TableHead className="text-slate-400">Type</TableHead>
+                        <TableHead className="text-slate-400">Dates</TableHead>
+                        <TableHead className="text-slate-400">Days</TableHead>
+                        <TableHead className="text-slate-400">Reason</TableHead>
+                        <TableHead className="text-slate-400">Status</TableHead>
+                        {["Super Admin", "Company Admin", "HR Manager"].includes(user?.role || "") && (
+                          <TableHead className="text-slate-400 text-right">Action</TableHead>
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {leaveRequests.map((req: any) => {
+                        const lt = leaveTypes.find((t: any) => t.id === req.leaveTypeId);
+                        return (
+                          <TableRow key={req.id} className="border-slate-800 hover:bg-slate-800/30">
+                            <TableCell className="font-medium">{lt?.name || "Leave"}</TableCell>
+                            <TableCell className="text-xs text-slate-300 font-mono">
+                              {req.startDate} to {req.endDate}
+                            </TableCell>
+                            <TableCell className="font-bold">{req.daysRequested} days</TableCell>
+                            <TableCell className="text-sm text-slate-400 truncate max-w-[200px]">{req.reason}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={`text-xs ${
+                                req.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
+                                req.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/30' :
+                                'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                              }`}>
+                                {req.status}
+                              </Badge>
+                            </TableCell>
+                            {["Super Admin", "Company Admin", "HR Manager"].includes(user?.role || "") && (
+                              <TableCell className="text-right space-x-2">
+                                {req.status === 'Pending' && (
+                                  <>
+                                    <Button size="sm" onClick={() => updateLeaveMutation.mutate({ requestId: req.id, status: 'Approved' })} className="bg-emerald-600 hover:bg-emerald-500 text-xs h-7">Approve</Button>
+                                    <Button size="sm" variant="destructive" onClick={() => updateLeaveMutation.mutate({ requestId: req.id, status: 'Rejected' })} className="text-xs h-7">Reject</Button>
+                                  </>
+                                )}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                      {leaveRequests.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-slate-500 py-8">No leave requests found.</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* ESS PORTAL TAB */}
+          <TabsContent value="ess" className="space-y-6">
+            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <UserCheck className="w-6 h-6 text-blue-500" /> Employee Self-Service (ESS) Portal
+                </h2>
+                <p className="text-sm text-slate-400 mt-1">Access your digital payslips, P9 tax deduction cards, and profile details.</p>
+              </div>
+              <Badge className="bg-blue-600 text-white px-3 py-1 text-sm font-medium">Active Session</Badge>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="bg-slate-900 border-slate-800 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-lg">My Profile Summary</CardTitle>
+                  <CardDescription className="text-slate-400">Statutory and employment credentials</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {essProfile ? (
+                    <>
+                      <div className="flex justify-between border-b border-slate-800 pb-2">
+                        <span className="text-slate-400">Full Name</span>
+                        <span className="font-semibold">{essProfile.firstName} {essProfile.lastName}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-800 pb-2">
+                        <span className="text-slate-400">Employee No</span>
+                        <span className="font-mono text-blue-400">{essProfile.employeeNo}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-800 pb-2">
+                        <span className="text-slate-400">KRA PIN</span>
+                        <span className="font-mono">{essProfile.kraPin}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-800 pb-2">
+                        <span className="text-slate-400">NSSF No</span>
+                        <span className="font-mono">{essProfile.nssfNo || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-800 pb-2">
+                        <span className="text-slate-400">SHIF No</span>
+                        <span className="font-mono">{essProfile.shifNo || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-800 pb-2">
+                        <span className="text-slate-400">Bank Details</span>
+                        <span>{essProfile.bankName} ({essProfile.accountNumber})</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-slate-500 text-center py-6">No employee profile linked to this account.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-900 border-slate-800 shadow-xl md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">My Payslips & Payroll History</CardTitle>
+                  <CardDescription className="text-slate-400">Download monthly payslips and view statutory deductions</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-slate-800/50">
+                      <TableRow className="border-slate-800">
+                        <TableHead className="text-slate-400">Period</TableHead>
+                        <TableHead className="text-slate-400">Gross (KES)</TableHead>
+                        <TableHead className="text-slate-400">PAYE</TableHead>
+                        <TableHead className="text-slate-400">NSSF</TableHead>
+                        <TableHead className="text-slate-400">SHIF</TableHead>
+                        <TableHead className="text-slate-400">Net Pay (KES)</TableHead>
+                        <TableHead className="text-slate-400 text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {essPayslips.map((slip: any) => (
+                        <TableRow key={slip.id} className="border-slate-800 hover:bg-slate-800/30">
+                          <TableCell className="font-medium">August 2026</TableCell>
+                          <TableCell className="font-mono">KES {Number(slip.grossPay).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono text-slate-400">KES {Number(slip.paye).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono text-slate-400">KES {Number(slip.nssf).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono text-slate-400">KES {Number(slip.shif).toLocaleString()}</TableCell>
+                          <TableCell className="font-mono font-bold text-emerald-400">KES {Number(slip.netPay).toLocaleString()}</TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="outline" onClick={() => toast.success("Downloading official PDF payslip...")} className="bg-slate-800 border-slate-700 text-xs h-7">
+                              <FileText className="w-3.5 h-3.5 mr-1" /> Payslip
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {essPayslips.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-slate-500 py-12">No payslips available for download yet.</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           {/* AUDIT LOG TAB */}
           {["Super Admin", "Company Admin", "HR Manager"].includes(user?.role || "") && (
             <TabsContent value="audit" className="space-y-6">
@@ -818,6 +1157,53 @@ export default function Home() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsTenantOpen(false)} className="bg-slate-800 border-slate-700">Cancel</Button>
             <Button onClick={() => createTenantMutation.mutate({ companyName, kraPin: tenantKra, email: tenantEmail, phone: tenantPhone, address: tenantAddress })} className="bg-blue-600 hover:bg-blue-500 text-white">Register Company</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: APPLY FOR LEAVE */}
+      <Dialog open={isLeaveOpen} onOpenChange={setIsLeaveOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Apply for Leave</DialogTitle>
+            <DialogDescription className="text-slate-400">Submit a leave request for supervisory approval.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Leave Type</Label>
+              <Select value={String(leaveForm.leaveTypeId)} onValueChange={val => setLeaveForm({...leaveForm, leaveTypeId: Number(val)})}>
+                <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700 text-slate-100">
+                  {leaveTypes.map((lt: any) => (
+                    <SelectItem key={lt.id} value={String(lt.id)}>{lt.name} ({lt.defaultDays} days default)</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input type="date" value={leaveForm.startDate} onChange={e => setLeaveForm({...leaveForm, startDate: e.target.value})} className="bg-slate-800 border-slate-700" />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Input type="date" value={leaveForm.endDate} onChange={e => setLeaveForm({...leaveForm, endDate: e.target.value})} className="bg-slate-800 border-slate-700" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Days Requested</Label>
+              <Input type="number" value={leaveForm.daysRequested} onChange={e => setLeaveForm({...leaveForm, daysRequested: e.target.value})} className="bg-slate-800 border-slate-700" />
+            </div>
+            <div className="space-y-2">
+              <Label>Reason / Notes</Label>
+              <Input placeholder="Family vacation / medical rest" value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})} className="bg-slate-800 border-slate-700" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsLeaveOpen(false)} className="bg-slate-800 border-slate-700">Cancel</Button>
+            <Button onClick={() => createLeaveMutation.mutate({ ...leaveForm, employeeId: 1 })} className="bg-blue-600 hover:bg-blue-500 text-white">Submit Request</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

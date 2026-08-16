@@ -386,3 +386,153 @@ export const notifications = mysqlTable("notifications", {
 }, (table) => ({
   tenantIdx: index("tenant_idx").on(table.tenantId),
 }));
+
+
+// --- Phase 3: Approvals, Accounting, Time & Attendance, Recruitment, Performance, Assets ---
+
+export const approvalWorkflows = mysqlTable("approval_workflows", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  workflowType: varchar("workflowType", { length: 50 }).notNull(), // payroll, leave, recruitment, asset
+  stepOrder: int("stepOrder").notNull(),
+  roleRequired: varchar("roleRequired", { length: 50 }).notNull(), // Supervisor, HR Manager, Finance, Super Admin
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const approvalRequests = mysqlTable("approval_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  workflowType: varchar("workflowType", { length: 50 }).notNull(),
+  entityId: int("entityId").notNull(), // id of leave request, payroll run, job offer, etc.
+  currentStep: int("currentStep").default(1).notNull(),
+  status: mysqlEnum("status", ["Pending", "Approved", "Rejected", "Escalated"]).default("Pending").notNull(),
+  comments: text("comments"),
+  submittedBy: int("submittedBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const glAccounts = mysqlTable("gl_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  accountCode: varchar("accountCode", { length: 50 }).notNull(),
+  accountName: varchar("accountName", { length: 150 }).notNull(),
+  accountType: varchar("accountType", { length: 50 }).notNull(), // Asset, Liability, Equity, Revenue, Expense
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const journalEntries = mysqlTable("journal_entries", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  referenceNo: varchar("referenceNo", { length: 100 }).notNull(),
+  entryDate: date("entryDate").notNull(),
+  description: text("description").notNull(),
+  totalDebit: decimal("totalDebit", { precision: 15, scale: 2 }).notNull(),
+  totalCredit: decimal("totalCredit", { precision: 15, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["Draft", "Posted", "Void"]).default("Draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const shifts = mysqlTable("shifts", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(), // Morning, Afternoon, Night
+  startTime: varchar("startTime", { length: 10 }).notNull(), // 08:00
+  endTime: varchar("endTime", { length: 10 }).notNull(), // 17:00
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const attendanceLogs = mysqlTable("attendance_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  employeeId: int("employeeId").notNull(),
+  logDate: date("logDate").notNull(),
+  clockIn: timestamp("clockIn"),
+  clockOut: timestamp("clockOut"),
+  status: mysqlEnum("status", ["Present", "Absent", "Late", "On Leave", "Half Day"]).default("Present").notNull(),
+  overtimeHours: decimal("overtimeHours", { precision: 5, scale: 2 }).default("0.00").notNull(),
+  source: varchar("source", { length: 50 }).default("Biometric Device").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const jobVacancies = mysqlTable("job_vacancies", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  title: varchar("title", { length: 150 }).notNull(),
+  departmentId: int("departmentId").notNull(),
+  positions: int("positions").default(1).notNull(),
+  status: mysqlEnum("status", ["Open", "Closed", "Draft"]).default("Open").notNull(),
+  description: text("description").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const jobCandidates = mysqlTable("job_candidates", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  vacancyId: int("vacancyId").notNull(),
+  fullName: varchar("fullName", { length: 150 }).notNull(),
+  email: varchar("email", { length: 150 }).notNull(),
+  phone: varchar("phone", { length: 50 }).notNull(),
+  stage: mysqlEnum("stage", ["Applied", "Screening", "Interview", "Offer Extended", "Hired", "Rejected"]).default("Applied").notNull(),
+  score: decimal("score", { precision: 5, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const appraisalCycles = mysqlTable("appraisal_cycles", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 150 }).notNull(), // Q1 2026 Review, Annual 2025
+  startDate: date("startDate").notNull(),
+  endDate: date("endDate").notNull(),
+  status: mysqlEnum("status", ["Active", "Completed", "Draft"]).default("Active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const appraisals = mysqlTable("appraisals", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  cycleId: int("cycleId").notNull(),
+  employeeId: int("employeeId").notNull(),
+  goalsScore: decimal("goalsScore", { precision: 5, scale: 2 }),
+  competencyScore: decimal("competencyScore", { precision: 5, scale: 2 }),
+  finalScore: decimal("finalScore", { precision: 5, scale: 2 }),
+  comments: text("comments"),
+  status: mysqlEnum("status", ["Pending", "Reviewed", "Approved"]).default("Pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+export const assets = mysqlTable("assets", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  assetTag: varchar("assetTag", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 150 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(), // Laptop, Furniture, Vehicle, Equipment
+  serialNumber: varchar("serialNumber", { length: 100 }),
+  status: mysqlEnum("status", ["Available", "Assigned", "Under Maintenance", "Retired"]).default("Available").notNull(),
+  assignedTo: int("assignedTo"), // employeeId
+  purchaseDate: date("purchaseDate"),
+  purchaseCost: decimal("purchaseCost", { precision: 12, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));

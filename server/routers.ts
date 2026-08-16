@@ -703,6 +703,171 @@ export const appRouter = router({
       return await db.getEmployeePayslips(ctx.tenantId, empId);
     }),
   }),
+
+  enterprise: router({
+    approvals: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getApprovalRequests(ctx.tenantId);
+    }),
+    createApproval: tenantProcedure
+      .input(z.object({ workflowType: z.string(), entityId: z.number(), comments: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createApprovalRequest({
+          tenantId: ctx.tenantId,
+          workflowType: input.workflowType,
+          entityId: input.entityId,
+          currentStep: 1,
+          status: "Pending",
+          comments: input.comments || "Submitted for approval",
+          submittedBy: ctx.user.id
+        });
+        return { success: true, id };
+      }),
+    updateApproval: tenantProcedure
+      .input(z.object({ id: z.number(), status: z.enum(["Pending", "Approved", "Rejected", "Escalated"]), currentStep: z.number(), comments: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        await db.updateApprovalRequestStatus(input.id, ctx.tenantId, input.status, input.currentStep, input.comments);
+        return { success: true };
+      }),
+
+    glAccounts: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getGlAccounts(ctx.tenantId);
+    }),
+    createGlAccount: tenantProcedure
+      .input(z.object({ accountCode: z.string(), accountName: z.string(), accountType: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createGlAccount({ tenantId: ctx.tenantId, ...input });
+        return { success: true, id };
+      }),
+    journalEntries: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getJournalEntries(ctx.tenantId);
+    }),
+    createJournalEntry: tenantProcedure
+      .input(z.object({ referenceNo: z.string(), entryDate: z.string(), description: z.string(), totalDebit: z.string(), totalCredit: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createJournalEntry({
+          tenantId: ctx.tenantId,
+          referenceNo: input.referenceNo,
+          entryDate: new Date(input.entryDate),
+          description: input.description,
+          totalDebit: input.totalDebit as any,
+          totalCredit: input.totalCredit as any,
+          status: "Posted"
+        });
+        return { success: true, id };
+      }),
+
+    shifts: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getShifts(ctx.tenantId);
+    }),
+    createShift: tenantProcedure
+      .input(z.object({ name: z.string(), startTime: z.string(), endTime: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createShift({ tenantId: ctx.tenantId, ...input });
+        return { success: true, id };
+      }),
+    attendance: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getAttendanceLogs(ctx.tenantId);
+    }),
+    createAttendance: tenantProcedure
+      .input(z.object({ employeeId: z.number(), logDate: z.string(), status: z.enum(["Present", "Absent", "Late", "On Leave", "Half Day"]), overtimeHours: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createAttendanceLog({
+          tenantId: ctx.tenantId,
+          employeeId: input.employeeId,
+          logDate: new Date(input.logDate),
+          status: input.status,
+          overtimeHours: input.overtimeHours as any,
+          source: "Biometric Device"
+        });
+        return { success: true, id };
+      }),
+
+    vacancies: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getJobVacancies(ctx.tenantId);
+    }),
+    createVacancy: tenantProcedure
+      .input(z.object({ title: z.string(), departmentId: z.number(), positions: z.number(), description: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createJobVacancy({ tenantId: ctx.tenantId, ...input, status: "Open" });
+        return { success: true, id };
+      }),
+    candidates: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getJobCandidates(ctx.tenantId);
+    }),
+    createCandidate: tenantProcedure
+      .input(z.object({ vacancyId: z.number(), fullName: z.string(), email: z.string(), phone: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createJobCandidate({ tenantId: ctx.tenantId, vacancyId: input.vacancyId, fullName: input.fullName, email: input.email, phone: input.phone, stage: "Applied" });
+        return { success: true, id };
+      }),
+    updateCandidate: tenantProcedure
+      .input(z.object({ id: z.number(), stage: z.enum(["Applied", "Screening", "Interview", "Offer Extended", "Hired", "Rejected"]), score: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        await db.updateCandidateStage(input.id, ctx.tenantId, input.stage, input.score);
+        return { success: true };
+      }),
+
+    appraisalCycles: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getAppraisalCycles(ctx.tenantId);
+    }),
+    createCycle: tenantProcedure
+      .input(z.object({ name: z.string(), startDate: z.string(), endDate: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createAppraisalCycle({
+          tenantId: ctx.tenantId,
+          name: input.name,
+          startDate: new Date(input.startDate),
+          endDate: new Date(input.endDate),
+          status: "Active"
+        });
+        return { success: true, id };
+      }),
+    appraisals: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getAppraisals(ctx.tenantId);
+    }),
+    createAppraisal: tenantProcedure
+      .input(z.object({ cycleId: z.number(), employeeId: z.number(), goalsScore: z.string(), competencyScore: z.string(), comments: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const g = parseFloat(input.goalsScore);
+        const c = parseFloat(input.competencyScore);
+        const final = ((g + c) / 2).toFixed(2);
+        const id = await db.createAppraisal({
+          tenantId: ctx.tenantId,
+          cycleId: input.cycleId,
+          employeeId: input.employeeId,
+          goalsScore: input.goalsScore as any,
+          competencyScore: input.competencyScore as any,
+          finalScore: final as any,
+          comments: input.comments,
+          status: "Reviewed"
+        });
+        return { success: true, id };
+      }),
+
+    assets: tenantProcedure.query(async ({ ctx }) => {
+      return await db.getAssets(ctx.tenantId);
+    }),
+    createAsset: tenantProcedure
+      .input(z.object({ assetTag: z.string(), name: z.string(), category: z.string(), serialNumber: z.string().optional(), purchaseCost: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.createAsset({
+          tenantId: ctx.tenantId,
+          assetTag: input.assetTag,
+          name: input.name,
+          category: input.category,
+          serialNumber: input.serialNumber,
+          purchaseCost: input.purchaseCost ? (input.purchaseCost as any) : undefined,
+          status: "Available"
+        });
+        return { success: true, id };
+      }),
+    assignAsset: tenantProcedure
+      .input(z.object({ id: z.number(), employeeId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await db.assignAsset(input.id, ctx.tenantId, input.employeeId, "Assigned");
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

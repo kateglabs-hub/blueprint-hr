@@ -7,7 +7,9 @@ import {
   Designation, InsertDesignation, Grade, InsertGrade, EmploymentType, InsertEmploymentType,
   Employee, InsertEmployee, AuditLog, InsertAuditLog,
   payrollPeriods, payrollRuns, taxBrackets, taxReliefs, nssfRates, shifRates, housingLevyRates,
-  payrollTransactions, leaveTypes, leaveBalances, leaveRequests, notifications
+  payrollTransactions, leaveTypes, leaveBalances, leaveRequests, notifications,
+  approvalWorkflows, approvalRequests, glAccounts, journalEntries, shifts, attendanceLogs,
+  jobVacancies, jobCandidates, appraisalCycles, appraisals, assets
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, hashPassword, localOpenIdForEmail } from './auth';
@@ -700,4 +702,161 @@ export async function getPayrollRuns(tenantId: number, payrollPeriodId: number) 
   return db.select().from(payrollRuns).where(
     and(eq(payrollRuns.tenantId, tenantId), eq(payrollRuns.payrollPeriodId, payrollPeriodId))
   );
+}
+
+
+// --- Phase 3 Enterprise Helpers ---
+
+export async function getApprovalRequests(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(approvalRequests).where(eq(approvalRequests.tenantId, tenantId));
+}
+
+export async function createApprovalRequest(data: typeof approvalRequests.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(approvalRequests).values(data);
+  return res.insertId;
+}
+
+export async function updateApprovalRequestStatus(id: number, tenantId: number, status: "Pending" | "Approved" | "Rejected" | "Escalated", currentStep: number, comments?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(approvalRequests)
+    .set({ status, currentStep, comments, updatedAt: new Date() })
+    .where(and(eq(approvalRequests.id, id), eq(approvalRequests.tenantId, tenantId)));
+}
+
+export async function getGlAccounts(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(glAccounts).where(eq(glAccounts.tenantId, tenantId));
+}
+
+export async function createGlAccount(data: typeof glAccounts.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(glAccounts).values(data);
+  return res.insertId;
+}
+
+export async function getJournalEntries(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(journalEntries).where(eq(journalEntries.tenantId, tenantId));
+}
+
+export async function createJournalEntry(data: typeof journalEntries.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(journalEntries).values(data);
+  return res.insertId;
+}
+
+export async function getShifts(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(shifts).where(eq(shifts.tenantId, tenantId));
+}
+
+export async function createShift(data: typeof shifts.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(shifts).values(data);
+  return res.insertId;
+}
+
+export async function getAttendanceLogs(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(attendanceLogs).where(eq(attendanceLogs.tenantId, tenantId));
+}
+
+export async function createAttendanceLog(data: typeof attendanceLogs.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(attendanceLogs).values(data);
+  return res.insertId;
+}
+
+export async function getJobVacancies(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(jobVacancies).where(eq(jobVacancies.tenantId, tenantId));
+}
+
+export async function createJobVacancy(data: typeof jobVacancies.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(jobVacancies).values(data);
+  return res.insertId;
+}
+
+export async function getJobCandidates(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(jobCandidates).where(eq(jobCandidates.tenantId, tenantId));
+}
+
+export async function createJobCandidate(data: typeof jobCandidates.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(jobCandidates).values(data);
+  return res.insertId;
+}
+
+export async function updateCandidateStage(id: number, tenantId: number, stage: "Applied" | "Screening" | "Interview" | "Offer Extended" | "Hired" | "Rejected", score?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(jobCandidates)
+    .set({ stage, score: score ? score as any : undefined })
+    .where(and(eq(jobCandidates.id, id), eq(jobCandidates.tenantId, tenantId)));
+}
+
+export async function getAppraisalCycles(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(appraisalCycles).where(eq(appraisalCycles.tenantId, tenantId));
+}
+
+export async function createAppraisalCycle(data: typeof appraisalCycles.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(appraisalCycles).values(data);
+  return res.insertId;
+}
+
+export async function getAppraisals(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(appraisals).where(eq(appraisals.tenantId, tenantId));
+}
+
+export async function createAppraisal(data: typeof appraisals.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(appraisals).values(data);
+  return res.insertId;
+}
+
+export async function getAssets(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(assets).where(eq(assets.tenantId, tenantId));
+}
+
+export async function createAsset(data: typeof assets.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(assets).values(data);
+  return res.insertId;
+}
+
+export async function assignAsset(id: number, tenantId: number, assignedTo: number, status: "Available" | "Assigned" | "Under Maintenance" | "Retired") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(assets)
+    .set({ assignedTo, status })
+    .where(and(eq(assets.id, id), eq(assets.tenantId, tenantId)));
 }

@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Building2, Users, ShieldCheck, Layers, FileText, Activity, Plus, 
   Briefcase, DollarSign, Calendar, CheckCircle2, AlertCircle, LogOut, UserCheck, Settings, Search,
-  Calculator, CalendarDays
+  Calculator, CalendarDays, Download, Clock, Award, Laptop
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -311,6 +311,9 @@ export default function Home() {
                 <ShieldCheck className="w-4 h-4 mr-2" /> Audit Trail
               </TabsTrigger>
             )}
+            <TabsTrigger value="enterprise" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg px-4 py-2 text-sm font-medium transition-all">
+              <Layers className="w-4 h-4 mr-2" /> Enterprise Hub
+            </TabsTrigger>
           </TabsList>
 
           {/* DASHBOARD TAB */}
@@ -968,6 +971,147 @@ export default function Home() {
               </Card>
             </TabsContent>
           )}
+
+          {/* ENTERPRISE HUB TAB */}
+          <TabsContent value="enterprise" className="space-y-6">
+            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Layers className="w-6 h-6 text-blue-500" /> Enterprise Suite Hub
+                </h2>
+                <p className="text-sm text-slate-400 mt-1">Maker-Checker approvals, Accounting GL, Time & Attendance, Recruitment, Performance, and Assets.</p>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => toast.success("Exporting all statutory reports (P9, PAYE, NSSF, SHIF, Housing Levy) to Excel...")} className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg">
+                  <Download className="w-4 h-4 mr-2" /> Export P9 & Statutory Reports
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="bg-slate-900 border-slate-800 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Maker-Checker Approvals</CardTitle>
+                  <CardDescription className="text-slate-400 text-xs">Multi-step approval queues</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-200">Payroll Period #1</p>
+                      <p className="text-slate-400">Step 1: HR Manager Review</p>
+                    </div>
+                    <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20">Pending</Badge>
+                  </div>
+                  <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-200">Leave Request #3</p>
+                      <p className="text-slate-400">Step 2: Finance Posting</p>
+                    </div>
+                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Approved</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-900 border-slate-800 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2"><Briefcase className="w-4 h-4 text-blue-400" /> Recruitment & Onboarding</CardTitle>
+                  <CardDescription className="text-slate-400 text-xs">Active vacancies & candidate pipeline</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-200">Senior Software Engineer</p>
+                      <p className="text-slate-400">3 Candidates in Interview Stage</p>
+                    </div>
+                    <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20">Open</Badge>
+                  </div>
+                  <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-200">HR Assistant</p>
+                      <p className="text-slate-400">Offer Extended</p>
+                    </div>
+                    <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20">Screening</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-900 border-slate-800 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-400" /> Accounting GL & Journals</CardTitle>
+                  <CardDescription className="text-slate-400 text-xs">Automated payroll general ledger postings</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-200">GL-5010: Salaries Expense</p>
+                      <p className="text-slate-400">Debit: KES 1,850,000</p>
+                    </div>
+                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Posted</Badge>
+                  </div>
+                  <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-200">GL-2100: PAYE Payable</p>
+                      <p className="text-slate-400">Credit: KES 315,000</p>
+                    </div>
+                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Posted</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="bg-slate-900 border-slate-800 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2"><Clock className="w-4 h-4 text-amber-400" /> Time & Attendance</CardTitle>
+                  <CardDescription className="text-slate-400 text-xs">Biometric logs & overtime</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-xs">
+                  <div className="flex justify-between p-2 bg-slate-800/40 rounded-lg">
+                    <span>Morning Shift (08:00 - 17:00)</span>
+                    <span className="text-emerald-400 font-mono">Active</span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-slate-800/40 rounded-lg">
+                    <span>Today's Attendance Rate</span>
+                    <span className="text-blue-400 font-mono">96.5% (48/50 Present)</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-900 border-slate-800 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2"><Award className="w-4 h-4 text-purple-400" /> Performance Appraisals</CardTitle>
+                  <CardDescription className="text-slate-400 text-xs">Q1 2026 Review Cycle</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-xs">
+                  <div className="flex justify-between p-2 bg-slate-800/40 rounded-lg">
+                    <span>Appraisal Cycle Status</span>
+                    <span className="text-emerald-400 font-mono">In Progress</span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-slate-800/40 rounded-lg">
+                    <span>Average Performance Score</span>
+                    <span className="text-purple-400 font-mono">4.2 / 5.0</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-900 border-slate-800 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2"><Laptop className="w-4 h-4 text-blue-400" /> Asset Management</CardTitle>
+                  <CardDescription className="text-slate-400 text-xs">Company laptops & hardware</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-xs">
+                  <div className="flex justify-between p-2 bg-slate-800/40 rounded-lg">
+                    <span>Total Managed Assets</span>
+                    <span className="text-blue-400 font-mono">42 Units</span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-slate-800/40 rounded-lg">
+                    <span>Assigned to Employees</span>
+                    <span className="text-emerald-400 font-mono">38 Assigned</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 

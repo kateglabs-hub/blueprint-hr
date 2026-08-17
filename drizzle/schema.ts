@@ -570,3 +570,88 @@ export const notificationLogs = mysqlTable("notification_logs", {
 }, (table) => ({
   tenantIdx: index("tenant_idx").on(table.tenantId),
 }));
+
+/**
+ * Statutory filing logs for KRA iTax, NSSF, and SHIF portal submissions.
+ */
+export const statutoryFilingLogs = mysqlTable("statutory_filing_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  portal: mysqlEnum("portal", ["KRA iTax", "NSSF Portal", "SHIF Portal"]).notNull(),
+  periodName: varchar("periodName", { length: 50 }).notNull(),
+  totalRecords: int("totalRecords").notNull(),
+  totalAmount: decimal("totalAmount", { precision: 15, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["Submitted", "Accepted", "Rejected", "Pending"]).default("Submitted").notNull(),
+  acknowledgementNo: varchar("acknowledgementNo", { length: 100 }),
+  responseMessage: text("responseMessage"),
+  submittedBy: int("submittedBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * M-Pesa B2C salary disbursement logs.
+ */
+export const mpesaDisbursements = mysqlTable("mpesa_disbursements", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  payrollPeriodId: int("payrollPeriodId").notNull(),
+  employeeId: int("employeeId").notNull(),
+  phone: varchar("phone", { length: 30 }).notNull(),
+  amount: decimal("totalAmount", { precision: 12, scale: 2 }).notNull(),
+  conversationId: varchar("conversationId", { length: 100 }),
+  originatorConversationId: varchar("originatorConversationId", { length: 100 }),
+  receiptNo: varchar("receiptNo", { length: 50 }),
+  status: mysqlEnum("status", ["Initiated", "Success", "Failed"]).default("Initiated").notNull(),
+  resultDesc: text("resultDesc"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * Custom report configurations.
+ */
+export const customReports = mysqlTable("custom_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  reportName: varchar("reportName", { length: 150 }).notNull(),
+  dataSource: varchar("dataSource", { length: 50 }).notNull(), // 'employees', 'payroll', 'leave', 'attendance'
+  selectedFields: text("selectedFields").notNull(), // JSON array of field names
+  filters: text("filters"), // JSON filter criteria
+  scheduledCron: varchar("scheduledCron", { length: 50 }), // optional cron for scheduled delivery
+  recipientEmail: varchar("recipientEmail", { length: 250 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * IP whitelists for sensitive payroll and admin operations.
+ */
+export const ipWhitelists = mysqlTable("ip_whitelists", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  ipAddress: varchar("ipAddress", { length: 50 }).notNull(),
+  description: varchar("description", { length: 150 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * Kenya Data Protection Act (DPA) data retention and erasure requests.
+ */
+export const dpaErasureRequests = mysqlTable("dpa_erasure_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  employeeId: int("employeeId"),
+  requesterEmail: varchar("requesterEmail", { length: 150 }).notNull(),
+  reason: text("reason").notNull(),
+  status: mysqlEnum("status", ["Pending", "Approved", "Anonymized", "Rejected"]).default("Pending").notNull(),
+  processedAt: timestamp("processedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));

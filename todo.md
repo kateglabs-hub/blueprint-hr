@@ -9,3 +9,14 @@
 - [x] Ensure robust database schema initialization before seeding
 - [x] Execute test suite and verify deployed application accessibility
 - [x] Fix production admin login: verify and seed admin@blueprinthr.co.ke with a valid password hash, harden seed repair behavior, test login, and deploy the correction.
+- [ ] Implement KRA iTax integration stub for direct PAYE filing
+- [ ] Implement NSSF/SHIF portal integration stub for statutory remittances
+- [ ] Implement M-Pesa B2C integration for salary disbursement
+- [ ] Implement accounting system exports (QuickBooks, Sage, Tally formats)
+- [ ] Implement executive HR dashboard with headcount trends, attrition rates, and cost analysis
+- [ ] Implement custom report builder with drag-and-drop fields
+- [ ] Implement scheduled report delivery via email (Heartbeat cron)
+- [ ] Implement payroll cost forecasting engine
+- [ ] Implement data encryption at rest for salary and personal ID fields
+- [ ] Implement IP whitelisting middleware for sensitive payroll operations
+- [ ] Implement Kenya Data Protection Act compliance features (retention policies, right to erasure)

@@ -861,3 +861,65 @@ export async function assignAsset(id: number, tenantId: number, assignedTo: numb
     .set({ assignedTo, status })
     .where(and(eq(assets.id, id), eq(assets.tenantId, tenantId)));
 }
+
+import { statutoryFilingLogs, mpesaDisbursements, customReports, ipWhitelists, dpaErasureRequests } from "../drizzle/schema";
+
+export async function getStatutoryFilingLogs(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(statutoryFilingLogs).where(eq(statutoryFilingLogs.tenantId, tenantId));
+}
+export async function createStatutoryFilingLog(data: typeof statutoryFilingLogs.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(statutoryFilingLogs).values(data);
+  return res.insertId;
+}
+
+export async function getMpesaDisbursements(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(mpesaDisbursements).where(eq(mpesaDisbursements.tenantId, tenantId));
+}
+export async function createMpesaDisbursement(data: typeof mpesaDisbursements.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(mpesaDisbursements).values(data);
+  return res.insertId;
+}
+
+export async function getCustomReports(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(customReports).where(eq(customReports.tenantId, tenantId));
+}
+export async function createCustomReport(data: typeof customReports.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(customReports).values(data);
+  return res.insertId;
+}
+
+export async function getIpWhitelists(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(ipWhitelists).where(eq(ipWhitelists.tenantId, tenantId));
+}
+export async function createIpWhitelist(data: typeof ipWhitelists.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(ipWhitelists).values(data);
+  return res.insertId;
+}
+
+export async function getDpaErasureRequests(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(dpaErasureRequests).where(eq(dpaErasureRequests.tenantId, tenantId));
+}
+export async function createDpaErasureRequest(data: typeof dpaErasureRequests.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [res] = await db.insert(dpaErasureRequests).values(data);
+  return res.insertId;
+}

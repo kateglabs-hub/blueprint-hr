@@ -536,3 +536,37 @@ export const assets = mysqlTable("assets", {
 }, (table) => ({
   tenantIdx: index("tenant_idx").on(table.tenantId),
 }));
+
+/**
+ * Loan and SACCO Deductions table for monthly recurring employee payroll deductions.
+ */
+export const employeeLoans = mysqlTable("employee_loans", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  employeeId: int("employeeId").notNull(),
+  loanType: varchar("loanType", { length: 50 }).notNull(), // 'SACCO Principal', 'SACCO Interest', 'Company Advance', 'Welfare'
+  totalAmount: decimal("totalAmount", { precision: 12, scale: 2 }).notNull(),
+  monthlyDeduction: decimal("monthlyDeduction", { precision: 12, scale: 2 }).notNull(),
+  balance: decimal("balance", { precision: 12, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["Active", "Completed", "Suspended"]).default("Active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * System notification logs table for Email and SMS dispatches.
+ */
+export const notificationLogs = mysqlTable("notification_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  recipientEmail: varchar("recipientEmail", { length: 150 }),
+  recipientPhone: varchar("recipientPhone", { length: 50 }),
+  channel: mysqlEnum("channel", ["Email", "SMS"]).notNull(),
+  subject: varchar("subject", { length: 250 }),
+  message: text("message").notNull(),
+  status: mysqlEnum("status", ["Sent", "Failed", "Pending"]).default("Sent").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));

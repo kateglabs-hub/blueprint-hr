@@ -655,3 +655,92 @@ export const dpaErasureRequests = mysqlTable("dpa_erasure_requests", {
 }, (table) => ({
   tenantIdx: index("tenant_idx").on(table.tenantId),
 }));
+
+/**
+ * Onboarding tasks and e-signatures.
+ */
+export const onboardingTasks = mysqlTable("onboarding_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  employeeId: int("employeeId").notNull(),
+  taskName: varchar("taskName", { length: 150 }).notNull(),
+  status: mysqlEnum("status", ["Pending", "Completed", "Signed"]).default("Pending").notNull(),
+  signatureUrl: text("signatureUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * Training and learning management.
+ */
+export const trainingCourses = mysqlTable("training_courses", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  title: varchar("training_courses_title", { length: 150 }).notNull(),
+  description: text("description"),
+  instructor: varchar("instructor", { length: 100 }),
+  status: mysqlEnum("status", ["Active", "Completed", "Draft"]).default("Active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * Employee engagement surveys.
+ */
+export const engagementSurveys = mysqlTable("engagement_surveys", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  title: varchar("engagement_surveys_title", { length: 150 }).notNull(),
+  question: text("question").notNull(),
+  averageScore: decimal("averageScore", { precision: 3, scale: 2 }).default("0.00").notNull(),
+  responsesCount: int("responsesCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * Medical insurance claims management.
+ */
+export const insuranceClaims = mysqlTable("insurance_claims", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  employeeId: int("employeeId").notNull(),
+  provider: varchar("provider", { length: 100 }).notNull(), // 'Jubilee', 'AAR', 'Resolution'
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["Submitted", "Approved", "Paid", "Rejected"]).default("Submitted").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * Fleet and vehicle management.
+ */
+export const fleetVehicles = mysqlTable("fleet_vehicles", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  registrationNo: varchar("registrationNo", { length: 30 }).notNull(),
+  model: varchar("model", { length: 100 }).notNull(),
+  status: mysqlEnum("status", ["Available", "Assigned", "In Maintenance"]).default("Available").notNull(),
+  assignedTo: int("assignedTo"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));
+
+/**
+ * Tenant branding and theme customisation.
+ */
+export const tenantBranding = mysqlTable("tenant_branding", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().unique(),
+  primaryColor: varchar("primaryColor", { length: 20 }).default("#2563eb").notNull(),
+  logoUrl: text("logoUrl"),
+  language: mysqlEnum("language", ["en", "sw"]).default("en").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("tenant_idx").on(table.tenantId),
+}));

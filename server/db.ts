@@ -32,12 +32,13 @@ export async function seedInitialData() {
   const db = await getDb();
   if (!db) return;
   try {
-    // Check if tenant exists
+    // Check if tenant exists with robust error handling for missing tables
     let existingTenants: any[] = [];
     try {
       existingTenants = await db.select().from(tenants).limit(1);
-    } catch {
-      // Tables might be initializing
+    } catch (e) {
+      console.warn("[Database] Tenants table not ready yet during seed check:", e);
+      return;
     }
     if (existingTenants.length === 0) {
       await db.insert(tenants).values({

@@ -21,3 +21,4 @@
 - [ ] Implement IP whitelisting middleware for sensitive payroll operations
 - [ ] Implement Kenya Data Protection Act compliance features (retention policies, right to erasure)
 - [ ] Create a public GitHub repository and push the latest BluePrint HR source code
+- [ ] Retry the requested GitHub publication after verifying the account's repository-creation permission

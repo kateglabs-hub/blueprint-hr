@@ -20,3 +20,4 @@
 - [ ] Implement data encryption at rest for salary and personal ID fields
 - [ ] Implement IP whitelisting middleware for sensitive payroll operations
 - [ ] Implement Kenya Data Protection Act compliance features (retention policies, right to erasure)
+- [ ] Create a public GitHub repository and push the latest BluePrint HR source code
